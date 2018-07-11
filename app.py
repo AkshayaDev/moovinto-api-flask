@@ -1,5 +1,10 @@
 from flask import Flask, request, jsonify, make_response
 from flask_restplus import Api, Resource
+from datetime import datetime
+from flask_jwt_extended import (
+    JWTManager, jwt_required, create_access_token,
+    get_jwt_identity
+)
 import pymongo
 import bcrypt
 
@@ -9,6 +14,9 @@ database = client['moovintodb']
 users = database['users']
 
 app = Flask(__name__)
+# Setup the Flask-JWT-Extended extension
+app.config['JWT_SECRET_KEY'] = 'super-unique-secret'  # Change this!
+jwt = JWTManager(app)
 app.config.SWAGGER_UI_DOC_EXPANSION = 'list'
 app.config.SWAGGER_UI_OPERATION_ID = True
 app.config.SWAGGER_UI_REQUEST_DURATION = True
@@ -38,9 +46,12 @@ class Login(Resource):
 
             if login_user:
                 hashedpw = login_user['password']
-                api_token = login_user['api_token']
+                mongo_id = login_user['_id']
                 if bcrypt.checkpw(password.encode('utf-8'), hashedpw):
-                    return make_response(jsonify({"success": "true","status_code": 200, "payload": { "api_token": api_token}}))
+                    # Identity can be any data that is json serializable
+                    access_token = create_access_token(identity = login_user['username'])
+                    users.find_one_and_update({"_id": mongo_id},{"$set": {"api_token": access_token}})
+                    return make_response(jsonify({"success": "true","status_code": 200, "payload": { "api_token": access_token}}))
                 else:
                     return make_response(jsonify({"success": "false", "status_code": 401, "payload": {},
                             "error": {"message": "Unauthorized"}}), 401)
@@ -71,22 +82,23 @@ class Register(Resource):
                                 "error": {"message": "User already exists"}}), 400)
                     else:
                         pwhashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt(14))
+                        api_token = create_access_token(identity=username)
                         newuser = {
                             "username": username,
                             "firstname": "",
                             "lastname": "",
                             "email": "",
                             "password": pwhashed,
-                            "api_token": "",
+                            "api_token": api_token,
                             "user_type": "",
                             "user_status": "",
                             "user_activation_key": "",
                             "remember_token": "",
-                            "created_at": "",
-                            "updated_at": ""
+                            "created_at": datetime.now(),
+                            "updated_at": datetime.now()
                         }
                         database.users.insert_one(newuser)
-                        return make_response(jsonify({"success": "true", "status_code": 200, "payload": {"api_token": ""}}), 200)
+                        return make_response(jsonify({"success": "true", "status_code": 200, "payload": {"api_token": api_token}}), 200)
 
                 else:
                     return make_response(jsonify({"success": "false", "status_code": 400, "payload": {},

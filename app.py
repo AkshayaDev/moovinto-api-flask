@@ -1,4 +1,4 @@
-from flask import Flask, request
+from flask import Flask, request, jsonify, make_response
 from flask_restplus import Api, Resource
 import pymongo
 import bcrypt
@@ -27,12 +27,12 @@ class Login(Resource):
             password = data['password']
 
             if not username:
-                return {"success": "false", "status_code": 400, "payload": {},
-                        "error": {"message": "Field cannot be empty"}}
+                return make_response(jsonify({"success": "false", "status_code": 400, "payload": {},
+                        "error": {"message": "Field cannot be empty"}}), 400)
 
             if not password:
-                return {"success": "false", "status_code": 400, "payload": {},
-                        "error": {"message": "Field cannot be empty"}}
+                return make_response(jsonify({"success": "false", "status_code": 400, "payload": {},
+                        "error": {"message": "Field cannot be empty"}}), 400)
 
             login_user = users.find_one({ "username" : username })
 
@@ -40,17 +40,17 @@ class Login(Resource):
                 hashedpw = login_user['password']
                 api_token = login_user['api_token']
                 if bcrypt.checkpw(password.encode('utf-8'), hashedpw):
-                    return {"success": "true","status_code": 200, "payload": { "api_token": api_token}}
+                    return make_response(jsonify({"success": "true","status_code": 200, "payload": { "api_token": api_token}}))
                 else:
-                    return {"success": "false", "status_code": 401, "payload": {},
-                            "error": {"message": "Unauthorized"}}
+                    return make_response(jsonify({"success": "false", "status_code": 401, "payload": {},
+                            "error": {"message": "Unauthorized"}}), 401)
 
             else:
-                return {"success": "false", "status_code": 401, "payload": {},
-                        "error": {"message": "Unauthorized"}}
+                return make_response(jsonify({"success": "false", "status_code": 401, "payload": {},
+                        "error": {"message": "Unauthorized"}}), 401)
         else:
-            return {"success": "false", "status_code": 401, "payload": {},
-                    "error": {"message": "Unauthorized"}}
+            return make_response(jsonify({"success": "false", "status_code": 401, "payload": {},
+                    "error": {"message": "Unauthorized"}}), 401)
 
 @api.route('/register', endpoint='register')
 @api.doc(params={'username': 'Username','password': 'Password','confpassword': 'Confirm Password'})
@@ -67,8 +67,8 @@ class Register(Resource):
                 if password == confpassword:
                     register_user = users.find_one({"username": username})
                     if register_user:
-                        return {"success": "false", "status_code": 400, "payload": {},
-                                "error": {"message": "User already exists"}}
+                        return make_response(jsonify({"success": "false", "status_code": 400, "payload": {},
+                                "error": {"message": "User already exists"}}), 400)
                     else:
                         pwhashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt(14))
                         newuser = {
@@ -86,15 +86,15 @@ class Register(Resource):
                             "updated_at": ""
                         }
                         database.users.insert_one(newuser)
-                        return {"success": "true", "status_code": 200, "payload": {"api_token": ""}}
+                        return make_response(jsonify({"success": "true", "status_code": 200, "payload": {"api_token": ""}}), 200)
 
                 else:
-                    return {"success": "false", "status_code": 400, "payload": {},
-                            "error": {"message": "Passwords not matched"}}
+                    return make_response(jsonify({"success": "false", "status_code": 400, "payload": {},
+                            "error": {"message": "Passwords not matched"}}), 400)
 
             else:
-                return {"success": "false", "status_code": 401, "payload": {},
-                        "error": {"message": "Unauthorized"}}
+                return make_response(jsonify({"success": "false", "status_code": 401, "payload": {},
+                        "error": {"message": "Unauthorized"}}), 401)
 
 if __name__ == '__main__':
     app.run(debug=True)

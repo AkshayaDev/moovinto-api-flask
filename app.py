@@ -23,11 +23,12 @@ app.config.SWAGGER_UI_REQUEST_DURATION = True
 api = Api(app, version='1.0', title='MoovInto API',
     description='A sample API for MoovInto')
 
-
 @api.route('/login', endpoint='login')
 @api.doc(params={'username': 'Username','password': 'Password'})
 class Login(Resource):
-    @api.doc(responses={401: 'Not Authorized'})
+    @api.response(200, 'Success')
+    @api.response(401, 'Not Authorized')
+    @api.response(400, 'Validation error')
     def post(self):
         if request.get_json():
             data = request.get_json()
@@ -51,7 +52,11 @@ class Login(Resource):
                     # Identity can be any data that is json serializable
                     access_token = create_access_token(identity = login_user['username'])
                     users.find_one_and_update({"_id": mongo_id},{"$set": {"api_token": access_token}})
-                    return make_response(jsonify({"success": "true","status_code": 200, "payload": { "api_token": access_token}}))
+                    login_payload = {
+                        "user_id": login_user['user_id'],
+                        "api_token": access_token
+                    }
+                    return make_response(jsonify({"success": "true","status_code": 200, "payload": login_payload}))
                 else:
                     return make_response(jsonify({"success": "false", "status_code": 401, "payload": {},
                             "error": {"message": "Unauthorized"}}), 401)
@@ -66,7 +71,9 @@ class Login(Resource):
 @api.route('/register', endpoint='register')
 @api.doc(params={'username': 'Username','password': 'Password','confpassword': 'Confirm Password'})
 class Register(Resource):
-    @api.doc(responses={401: 'Not Authorized'})
+    @api.response(200, 'Success')
+    @api.response(401, 'Not Authorized')
+    @api.response(400, 'Validation error')
     def post(self):
         if request.get_json():
             data = request.get_json()
@@ -83,7 +90,9 @@ class Register(Resource):
                     else:
                         pwhashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt(14))
                         api_token = create_access_token(identity=username)
+                        new_user_id = database.users.count()+1
                         newuser = {
+                            "user_id": new_user_id,
                             "username": username,
                             "firstname": "",
                             "lastname": "",
@@ -97,8 +106,15 @@ class Register(Resource):
                             "created_at": datetime.now(),
                             "updated_at": datetime.now()
                         }
+                        # database.users.create_index([('email', pymongo.ASCENDING)],unique = True)
+                        # database.users.create_index([('username', pymongo.ASCENDING)],unique = True)
+                        # database.users.create_index([('user_id', pymongo.ASCENDING)],unique = True)
                         database.users.insert_one(newuser)
-                        return make_response(jsonify({"success": "true", "status_code": 200, "payload": {"api_token": api_token}}), 200)
+                        register_payload = {
+                            "user_id": new_user_id,
+                            "api_token": api_token
+                        }
+                        return make_response(jsonify({"success": "true", "status_code": 200, "payload": register_payload}), 200)
 
                 else:
                     return make_response(jsonify({"success": "false", "status_code": 400, "payload": {},
@@ -107,6 +123,44 @@ class Register(Resource):
             else:
                 return make_response(jsonify({"success": "false", "status_code": 401, "payload": {},
                         "error": {"message": "Unauthorized"}}), 401)
+
+@api.route('/user/<int:user_id>')
+@api.doc(params={'id': 'An ID', 'API-TOKEN': 'API Token in headers'})
+class GetUser(Resource):
+    @api.response(200, 'Success')
+    @api.response(403, 'Not Authorized')
+    def get(self, user_id):
+        # check Api token exists
+        api_token = request.headers['API-TOKEN']
+        if not api_token:
+            return make_response(jsonify({"success": "false", "status_code": 403, "payload": {},
+                                          "error": {"message": "Unauthorized"}}), 403)
+
+        # check api token exists in db
+        register_user = users.find_one({"api_token": api_token})
+
+        if register_user:
+            register_user_api_token = register_user['api_token']
+            register_user_id = register_user['user_id']
+
+            if (register_user_api_token == api_token and register_user_id==user_id):
+                user_payload = {
+                    "user_id": register_user_id,
+                    "username": register_user['username'],
+                    "firstname": register_user['firstname'],
+                    "lastname": register_user['lastname'],
+                    "email": register_user['email'],
+                    "user_type": register_user['user_type']
+                }
+                return make_response(
+                    jsonify({"success": "true", "status_code": 200, "payload": user_payload}), 200)
+            else:
+                return make_response(jsonify({"success": "false", "status_code": 403, "payload": {},
+                                              "error": {"message": "Unauthorized"}}), 403)
+
+        else:
+            return make_response(jsonify({"success": "false", "status_code": 403, "payload": {},
+                                          "error": {"message": "Unauthorized"}}), 403)
 
 if __name__ == '__main__':
     app.run(debug=True)

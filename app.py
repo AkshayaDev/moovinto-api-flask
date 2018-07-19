@@ -1,5 +1,6 @@
-from flask import Flask, request, jsonify, make_response
+from flask import Flask, request, jsonify, make_response, render_template
 from flask_restplus import Api, Resource
+from flask_mail import Mail, Message
 from datetime import datetime
 from email_validator import validate_email, EmailNotValidError
 from flask_jwt_extended import (
@@ -14,10 +15,11 @@ client = pymongo.MongoClient(uri)
 database = client['moovintodb']
 users = database['users']
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder='templates')
 # Setup the Flask-JWT-Extended extension
 app.config['JWT_SECRET_KEY'] = 'super-unique-secret'  # Change this!
 jwt = JWTManager(app)
+mail = Mail(app)
 app.config.SWAGGER_UI_DOC_EXPANSION = 'list'
 app.config.SWAGGER_UI_OPERATION_ID = True
 app.config.SWAGGER_UI_REQUEST_DURATION = True
@@ -122,6 +124,7 @@ class Register(Resource):
                             "user_status": "",
                             "user_activation_key": "",
                             "remember_token": "",
+                            "password_reset_key": "",
                             "created_at": datetime.now(),
                             "updated_at": datetime.now()
                         }
@@ -253,6 +256,50 @@ class UpdateUser(Resource):
         else:
             return make_response(jsonify({"success": "false", "status_code": 403, "payload": {},
                                           "error": {"message": "Unauthorized"}}), 403)
+
+@api.route('/user/reset-password')
+@api.doc(params={'email': 'User Email'})
+class ResetPassword(Resource):
+    @api.response(200, 'Success')
+    @api.response(403, 'Not Authorized')
+    @api.response(400, 'Validation error')
+    def post(self):
+        if request.get_json():
+            data = request.get_json()
+            email = data['email']
+
+            if not email:
+                return make_response(jsonify({"success": "false", "status_code": 400, "payload": {},
+                        "error": {"message": "Field cannot be empty"}}), 400)
+
+            if email:
+                try:
+                    v = validate_email(email)  # validate and get info
+                    email = v["email"]  # replace with normalized form
+                except EmailNotValidError as e:
+                    # email is not valid, exception message is human-readable
+                    return make_response(jsonify({"success": "false", "status_code": 403, "payload": {},
+                                                  "error": {"message": str(e)}}), 403)
+
+            registered_user = users.find_one({ "email" : email })
+
+            if registered_user:
+                mongo_id = registered_user['_id']
+                update_user = {}
+                reset_key = create_access_token(identity=email)
+                update_user['password_reset_key'] = reset_key
+                users.find_one_and_update({"_id": mongo_id}, {"$set": update_user})
+                msg = Message(subject="MoovInto Password Reset",
+                              sender="moovinto@gmail.com",
+                              recipients=[email])
+                link = request.url_root + "?resetkey=" + reset_key
+                msg.html = render_template('/mails/reset-password.html', link=link)
+                mail.send(msg)
+
+            else:
+                return make_response(jsonify({"success": "false", "status_code": 403, "payload": {},
+                                          "error": {"message": "Unauthorized"}}), 403)
+
 
 if __name__ == '__main__':
     app.run(debug=True)

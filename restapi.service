@@ -1,0 +1,11 @@
+[Unit]
+Description=MoovInto Rest Service
+After=network.target
+[Service]
+Type=idle
+Restart=always
+RestartSec=1
+ExecStart=/usr/bin/python3 /home/dat-asset-12/PycharmProjects/moovinto-api-flask/app.py
+
+[Install]
+WantedBy=multi-user.target

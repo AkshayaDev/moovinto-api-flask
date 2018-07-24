@@ -1,0 +1,6 @@
+1> sudo subl /etc/systemd/system/restapi.service
+2> sudo chmod 644 /etc/systemd/system/restapi.service﻿
+3> sudo systemctl daemon-reload
+4> sudo systemctl enable restapi.service
+5> sudo systemctl start restapi.service
+6> sudo systemctl status restapi.service

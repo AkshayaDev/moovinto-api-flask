@@ -1,0 +1,10 @@
+$ sudo yum install screen
+
+# Create a new screen:
+screen -S <screen_name>
+# To switch back to your main terminal, hit
+control + a + d
+# To return to a screen:
+screen -r <screen_name>
+# And if you did something horrid and need to kill it:
+screen -X -S <screen_name> quit

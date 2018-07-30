@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify, make_response, render_template
-from flask_restplus import Api, Resource, fields
+from flask_restplus import Api, Resource, fields, Namespace
 from flask_mail import Mail, Message
 from datetime import datetime
 from email_validator import validate_email, EmailNotValidError
@@ -28,12 +28,22 @@ app.config.SWAGGER_UI_REQUEST_DURATION = True
 api = Api(app, version='1.0', title='MoovInto API',
     description='A sample API for MoovInto')
 
-@api.route('/login', endpoint='login')
-@api.doc(params={'email': 'Email','password': 'Password'})
+api.namespaces.clear()
+
+users_api = Namespace('user', description='User related operations')
+api.add_namespace(users_api)
+
+login_model = api.model('Login', {
+    'email': fields.String(description="User Email", required=True),
+    'password': fields.String(description="User Password", required=True),
+})
+
+@users_api.route('/login', endpoint='login')
 class Login(Resource):
     @api.response(200, 'Success')
     @api.response(401, 'Not Authorized')
     @api.response(400, 'Validation error')
+    @api.expect(login_model)
     def post(self):
         if request.get_json():
             data = request.get_json()
@@ -82,12 +92,18 @@ class Login(Resource):
             return make_response(jsonify({"success": "false", "status_code": 401, "payload": {},
                     "error": {"message": "Unauthorized"}}), 401)
 
-@api.route('/register', endpoint='register')
-@api.doc(params={'email': 'Email','password': 'Password','confpassword': 'Confirm Password'})
+register_model = api.model('Register', {
+    'email': fields.String(description="Email", required=True),
+    'password': fields.String(description="Password", required=True),
+    'confpassword': fields.String(description="Confirm Password", required=True),
+})
+
+@users_api.route('/register', endpoint='register')
 class Register(Resource):
     @api.response(200, 'Success')
     @api.response(401, 'Not Authorized')
     @api.response(400, 'Validation error')
+    @api.expect(register_model)
     def post(self):
         if request.get_json():
             data = request.get_json()
@@ -148,14 +164,17 @@ class Register(Resource):
                 return make_response(jsonify({"success": "false", "status_code": 401, "payload": {},
                         "error": {"message": "Unauthorized"}}), 401)
 
+
 get_user_parser = api.parser()
 get_user_parser.add_argument('API-TOKEN', location='headers')
 
-@api.route('/user/<int:user_id>')
-class GetUser(Resource):
+@users_api.route('/<int:user_id>')
+@api.header('API-TOKEN', 'User Api Token', required=True)
+@api.doc(params={'user_id': 'User ID'})
+@api.expect(get_user_parser)
+class User(Resource):
     @api.response(200, 'Success')
     @api.response(403, 'Not Authorized')
-    @api.expect(get_user_parser)
     def get(self, user_id):
         # check Api token exists
         api_token = request.headers['API-TOKEN']
@@ -193,13 +212,13 @@ class GetUser(Resource):
 update_user_parser = api.parser()
 update_user_parser.add_argument('API-TOKEN', location='headers')
 
-@api.route('/update-user')
+@users_api.route('/update-user')
 @api.doc(params={'firstname': 'Firstname', 'lastname': 'Lastname', 'email': 'Email', 'usertype': 'User Type', 'userstatus': 'User Status', 'password': 'Password'})
 class UpdateUser(Resource):
     @api.response(200, 'Success')
     @api.response(403, 'Not Authorized')
     @api.expect(update_user_parser)
-    def post(self):
+    def put(self):
         if request.get_json():
             data = request.get_json()
             api_token = request.headers['API-TOKEN']
@@ -266,7 +285,7 @@ class UpdateUser(Resource):
             return make_response(jsonify({"success": "false", "status_code": 403, "payload": {},
                                           "error": {"message": "Unauthorized"}}), 403)
 
-@api.route('/user/reset-password')
+@users_api.route('/reset-password')
 @api.doc(params={'email': 'User Email'})
 class ResetPassword(Resource):
     @api.response(200, 'Success')
@@ -312,13 +331,13 @@ class ResetPassword(Resource):
 
 renters_resource = api.parser()
 renters_resource.add_argument('API-TOKEN', location='headers')
-@api.route('/user/update-renters-data')
+@users_api.route('/update-renters-data')
 @api.doc(params={'accommodation_for': 'Looking for a place for', 'accommodation_wanted_applicants': 'data{}', 'teamup': 'Share house together', 'where_to_live': 'Location', 'max_budget': 'Max budget', 'move_date': 'Move Date', 'preferred_length_of_stay': 'Length of stay', 'about_renter': 'About Renter', 'renter_description': 'Renter Description', 'roommate_preferences': 'Roommate Preferences', 'email': 'Email'})
 class UpdateRentersData(Resource):
     @api.response(200, 'Success')
     @api.response(403, 'Not Authorized')
     @api.expect(renters_resource)
-    def post(self):
+    def put(self):
         if request.get_json():
             api_token = request.headers['API-TOKEN']
             data = request.get_json()
@@ -358,13 +377,13 @@ class UpdateRentersData(Resource):
 
 houseowners_resource = api.parser()
 houseowners_resource.add_argument('API-TOKEN', location='headers')
-@api.route('/user/update-houseowners-data')
+@users_api.route('/update-houseowners-data')
 @api.doc(params={'accommodation_for': 'Looking for a place for', 'accommodation_wanted_applicants': 'data{}', 'teamup': 'Share house together', 'where_to_live': 'Location', 'max_budget': 'Max budget', 'move_date': 'Move Date', 'preferred_length_of_stay': 'Length of stay', 'about_renter': 'About Renter', 'renter_description': 'Renter Description', 'roommate_preferences': 'Roommate Preferences', 'email': 'Email'})
 class UpdateHouseownersData(Resource):
     @api.response(200, 'Success')
     @api.response(403, 'Not Authorized')
     @api.expect(houseowners_resource)
-    def post(self):
+    def put(self):
         if request.get_json():
             api_token = request.headers['API-TOKEN']
             data = request.get_json()

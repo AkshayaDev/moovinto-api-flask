@@ -22,7 +22,7 @@ app = Flask(__name__, template_folder='templates')
 app.config['JWT_SECRET_KEY'] = 'super-unique-secret'  # Change this!
 jwt = JWTManager(app)
 mail = Mail(app)
-app.config.SWAGGER_UI_DOC_EXPANSION = 'list'
+app.config.SWAGGER_UI_DOC_EXPANSION = 'none'
 app.config.SWAGGER_UI_OPERATION_ID = True
 app.config.SWAGGER_UI_REQUEST_DURATION = True
 api = Api(app, version='1.0', title='MoovInto API',
@@ -43,7 +43,7 @@ class Login(Resource):
     @users_api.response(200, 'Success')
     @users_api.response(401, 'Not Authorized')
     @users_api.response(400, 'Validation error')
-    @users_api.expect(login_model)
+    @users_api.expect(login_model, validate=True)
     def post(self):
         if request.get_json():
             data = request.get_json()
@@ -103,7 +103,7 @@ class Register(Resource):
     @users_api.response(200, 'Success')
     @users_api.response(401, 'Not Authorized')
     @users_api.response(400, 'Validation error')
-    @users_api.expect(register_model)
+    @users_api.expect(register_model, validate=True)
     def post(self):
         if request.get_json():
             data = request.get_json()
@@ -171,7 +171,7 @@ get_user_parser.add_argument('user_id', type=int, location='args')
 
 @users_api.route('/<int:user_id>')
 @users_api.header('API-TOKEN', 'User Api Token', required=True)
-@users_api.expect(get_user_parser)
+@users_api.expect(get_user_parser, validate=True)
 class User(Resource):
     @users_api.response(200, 'Success')
     @users_api.response(403, 'Not Authorized')
@@ -223,7 +223,7 @@ update_user_model = api.model('Update User', {
 
 @users_api.route('/update-user')
 @users_api.header('API-TOKEN', 'User Api Token', required=True)
-@users_api.expect(update_user_parser)
+@users_api.expect(update_user_parser, validate=True)
 class UpdateUser(Resource):
     @users_api.response(200, 'Success')
     @users_api.response(403, 'Not Authorized')
@@ -308,12 +308,17 @@ class UpdateUser(Resource):
             return make_response(jsonify({"success": "false", "status_code": 403, "payload": {},
                                           "error": {"message": "Unauthorized"}}), 403)
 
+
+reset_pwd_model = api.model('Reset Password', {
+    'email': fields.String(description="Email")
+})
+
 @users_api.route('/reset-password')
-@users_api.doc(params={'email': 'User Email'})
 class ResetPassword(Resource):
     @users_api.response(200, 'Success')
     @users_api.response(403, 'Not Authorized')
     @users_api.response(400, 'Validation error')
+    @users_api.expect(reset_pwd_model, validate=True)
     def post(self):
         if request.get_json():
             data = request.get_json()
@@ -346,6 +351,8 @@ class ResetPassword(Resource):
                 link = request.url_root + "?resetkey=" + reset_key
                 msg.html = render_template('/mails/reset-password.html', link=link)
                 mail.send(msg)
+                return make_response(
+                    jsonify({"success": "true", "status_code": 200, "payload": {}}), 200)
 
             else:
                 return make_response(jsonify({"success": "false", "status_code": 403, "payload": {},
@@ -354,12 +361,27 @@ class ResetPassword(Resource):
 
 renters_resource = api.parser()
 renters_resource.add_argument('API-TOKEN', location='headers')
+
+
+update_renter_model = api.model('Update Renter', {
+    'accommodation_for': fields.String(description="Looking for a place for"),
+    'accommodation_wanted_applicants': fields.String(description="data{}"),
+    'teamup': fields.String(description="Share house together"),
+    'where_to_live': fields.String(description="Location"),
+    'max_budget': fields.String(description="Max budget"),
+    'move_date': fields.String(description="Move Date"),
+    'preferred_length_of_stay': fields.String(description="Length of stay"),
+    'about_renter': fields.String(description="About Renter"),
+    'renter_description': fields.String(description="Renter Description"),
+    'roommate_preferences': fields.String(description="Roommate Preferences")
+})
+
 @users_api.route('/update-renters-data')
-@users_api.doc(params={'accommodation_for': 'Looking for a place for', 'accommodation_wanted_applicants': 'data{}', 'teamup': 'Share house together', 'where_to_live': 'Location', 'max_budget': 'Max budget', 'move_date': 'Move Date', 'preferred_length_of_stay': 'Length of stay', 'about_renter': 'About Renter', 'renter_description': 'Renter Description', 'roommate_preferences': 'Roommate Preferences', 'email': 'Email'})
+@users_api.expect(renters_resource, validate=True)
 class UpdateRentersData(Resource):
     @users_api.response(200, 'Success')
     @users_api.response(403, 'Not Authorized')
-    @users_api.expect(renters_resource)
+    @users_api.expect(update_renter_model)
     def put(self):
         if request.get_json():
             api_token = request.headers['API-TOKEN']
@@ -373,21 +395,41 @@ class UpdateRentersData(Resource):
             register_user = users.find_one({"api_token": api_token})
 
             if register_user:
-                newrenter = {
-                    "accommodation_for": data['accommodation_for'],
-                    "accommodation_wanted_applicants": data['accommodation_wanted_applicants'],
-                    "teamup": data['teamup'],
-                    "where_to_live": data['where_to_live'],
-                    "max_budget": data['max_budget'],
-                    "move_date": data['move_date'],
-                    "preferred_length_of_stay": data['preferred_length_of_stay'],
-                    "about_renter": data['about_renter'],
-                    "renter_description": data['renter_description'],
-                    "roommate_preferences": data['roommate_preferences'],
-                    "email": register_user['email']
-                }
-                database.renters.insert_one(newrenter)
-                return make_response(jsonify({"success": "true", "status_code": 200, "payload": newrenter}), 200)
+                # check already exists
+                check_renter = renters.find_one({"email": register_user['email']})
+                if check_renter:
+                    mongo_id = check_renter['_id']
+                    update_renter = {
+                        "accommodation_for": data['accommodation_for'],
+                        "accommodation_wanted_applicants": data['accommodation_wanted_applicants'],
+                        "teamup": data['teamup'],
+                        "where_to_live": data['where_to_live'],
+                        "max_budget": data['max_budget'],
+                        "move_date": data['move_date'],
+                        "preferred_length_of_stay": data['preferred_length_of_stay'],
+                        "about_renter": data['about_renter'],
+                        "renter_description": data['renter_description'],
+                        "roommate_preferences": data['roommate_preferences']
+                    }
+                    renters.find_one_and_update({"_id": mongo_id}, {"$set": update_renter})
+                    return make_response(jsonify({"success": "true", "status_code": 200, "payload": update_renter}), 200)
+                else:
+                    newrenter = {
+                        "accommodation_for": data['accommodation_for'],
+                        "accommodation_wanted_applicants": data['accommodation_wanted_applicants'],
+                        "teamup": data['teamup'],
+                        "where_to_live": data['where_to_live'],
+                        "max_budget": data['max_budget'],
+                        "move_date": data['move_date'],
+                        "preferred_length_of_stay": data['preferred_length_of_stay'],
+                        "about_renter": data['about_renter'],
+                        "renter_description": data['renter_description'],
+                        "roommate_preferences": data['roommate_preferences'],
+                        "email": register_user['email']
+                    }
+                    database.renters.insert_one(newrenter)
+                    return make_response(jsonify({"success": "true", "status_code": 200, "payload": newrenter}), 200)
+
             else:
                 return make_response(jsonify({"success": "false", "status_code": 403, "payload": {},
                                               "error": {"message": "Unauthorized"}}), 403)
@@ -433,6 +475,37 @@ class UpdateHouseownersData(Resource):
         else:
             return make_response(jsonify({"success": "false", "status_code": 403, "payload": {},
                                       "error": {"message": "Unauthorized"}}), 403)
+
+
+property_api = Namespace('property', description='Property related operations')
+api.add_namespace(property_api)
+
+property_resource = api.parser()
+property_resource.add_argument('API-TOKEN', location='headers')
+
+
+add_property_model = api.model('Add Property', {
+    'name': fields.String(description="Name"),
+    'status': fields.String(description="Status"),
+    'address': fields.String(description="Address"),
+    'typeofproperty': fields.String(description="Type of property"),
+    'number_of_bedrooms': fields.String(description="Number of bedrooms"),
+    'number_of_bathrooms': fields.String(description="Number ofbathrooms"),
+    'number_of_flatmates': fields.String(description="Number of flatmates"),
+    'internet_access': fields.String(description="Internet access"),
+    'parking': fields.String(description="Parking"),
+    'room_details': fields.String(description="Room details"),
+    'description': fields.String(description="Description"),
+})
+
+@property_api.route('/add')
+@property_api.expect(property_resource)
+class UpdateRentersData(Resource):
+    @property_api.response(200, 'Success')
+    @property_api.response(403, 'Not Authorized')
+    @property_api.expect(add_property_model)
+    def post(self):
+        pass
 
 if __name__ == '__main__':
     app.run(debug=True)

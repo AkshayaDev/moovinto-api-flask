@@ -38,12 +38,12 @@ login_model = api.model('Login', {
     'password': fields.String(description="User Password", required=True),
 })
 
-@users_api.route('/login', endpoint='login')
+@users_api.route('/login')
 class Login(Resource):
-    @api.response(200, 'Success')
-    @api.response(401, 'Not Authorized')
-    @api.response(400, 'Validation error')
-    @api.expect(login_model)
+    @users_api.response(200, 'Success')
+    @users_api.response(401, 'Not Authorized')
+    @users_api.response(400, 'Validation error')
+    @users_api.expect(login_model)
     def post(self):
         if request.get_json():
             data = request.get_json()
@@ -98,12 +98,12 @@ register_model = api.model('Register', {
     'confpassword': fields.String(description="Confirm Password", required=True),
 })
 
-@users_api.route('/register', endpoint='register')
+@users_api.route('/register')
 class Register(Resource):
-    @api.response(200, 'Success')
-    @api.response(401, 'Not Authorized')
-    @api.response(400, 'Validation error')
-    @api.expect(register_model)
+    @users_api.response(200, 'Success')
+    @users_api.response(401, 'Not Authorized')
+    @users_api.response(400, 'Validation error')
+    @users_api.expect(register_model)
     def post(self):
         if request.get_json():
             data = request.get_json()
@@ -167,14 +167,14 @@ class Register(Resource):
 
 get_user_parser = api.parser()
 get_user_parser.add_argument('API-TOKEN', location='headers')
+get_user_parser.add_argument('user_id', type=int, location='args')
 
 @users_api.route('/<int:user_id>')
-@api.header('API-TOKEN', 'User Api Token', required=True)
-@api.doc(params={'user_id': 'User ID'})
-@api.expect(get_user_parser)
+@users_api.header('API-TOKEN', 'User Api Token', required=True)
+@users_api.expect(get_user_parser)
 class User(Resource):
-    @api.response(200, 'Success')
-    @api.response(403, 'Not Authorized')
+    @users_api.response(200, 'Success')
+    @users_api.response(403, 'Not Authorized')
     def get(self, user_id):
         # check Api token exists
         api_token = request.headers['API-TOKEN']
@@ -212,12 +212,22 @@ class User(Resource):
 update_user_parser = api.parser()
 update_user_parser.add_argument('API-TOKEN', location='headers')
 
+update_user_model = api.model('Update User', {
+    'firstname': fields.String(description="Firstname"),
+    'lastname': fields.String(description="Lastname"),
+    'email': fields.String(description="Email"),
+    'usertype': fields.String(description="User Type"),
+    'userstatus': fields.String(description="User Status"),
+    'password': fields.String(description="Password"),
+})
+
 @users_api.route('/update-user')
-@api.doc(params={'firstname': 'Firstname', 'lastname': 'Lastname', 'email': 'Email', 'usertype': 'User Type', 'userstatus': 'User Status', 'password': 'Password'})
+@users_api.header('API-TOKEN', 'User Api Token', required=True)
+@users_api.expect(update_user_parser)
 class UpdateUser(Resource):
-    @api.response(200, 'Success')
-    @api.response(403, 'Not Authorized')
-    @api.expect(update_user_parser)
+    @users_api.response(200, 'Success')
+    @users_api.response(403, 'Not Authorized')
+    @users_api.expect(update_user_model)
     def put(self):
         if request.get_json():
             data = request.get_json()
@@ -270,8 +280,21 @@ class UpdateUser(Resource):
 
                     users.find_one_and_update({"_id": mongo_id}, {"$set": update_user})
 
+                    registered_user = users.find_one({"_id": mongo_id})
+                    if registered_user:
+                        update_user_payload = {
+                            "user_id": registered_user['user_id'],
+                            "username": registered_user['username'],
+                            "firstname": registered_user['firstname'],
+                            "lastname": registered_user['lastname'],
+                            "email": registered_user['email'],
+                            "user_type": registered_user['user_type']
+                        }
+                    else:
+                        update_user_payload = {}
+
                     return make_response(
-                        jsonify({"success": "true", "status_code": 200, "payload": {}}), 200)
+                        jsonify({"success": "true", "status_code": 200, "payload": update_user_payload}), 200)
 
                 else:
                     return make_response(jsonify({"success": "false", "status_code": 403, "payload": {},
@@ -286,11 +309,11 @@ class UpdateUser(Resource):
                                           "error": {"message": "Unauthorized"}}), 403)
 
 @users_api.route('/reset-password')
-@api.doc(params={'email': 'User Email'})
+@users_api.doc(params={'email': 'User Email'})
 class ResetPassword(Resource):
-    @api.response(200, 'Success')
-    @api.response(403, 'Not Authorized')
-    @api.response(400, 'Validation error')
+    @users_api.response(200, 'Success')
+    @users_api.response(403, 'Not Authorized')
+    @users_api.response(400, 'Validation error')
     def post(self):
         if request.get_json():
             data = request.get_json()
@@ -332,11 +355,11 @@ class ResetPassword(Resource):
 renters_resource = api.parser()
 renters_resource.add_argument('API-TOKEN', location='headers')
 @users_api.route('/update-renters-data')
-@api.doc(params={'accommodation_for': 'Looking for a place for', 'accommodation_wanted_applicants': 'data{}', 'teamup': 'Share house together', 'where_to_live': 'Location', 'max_budget': 'Max budget', 'move_date': 'Move Date', 'preferred_length_of_stay': 'Length of stay', 'about_renter': 'About Renter', 'renter_description': 'Renter Description', 'roommate_preferences': 'Roommate Preferences', 'email': 'Email'})
+@users_api.doc(params={'accommodation_for': 'Looking for a place for', 'accommodation_wanted_applicants': 'data{}', 'teamup': 'Share house together', 'where_to_live': 'Location', 'max_budget': 'Max budget', 'move_date': 'Move Date', 'preferred_length_of_stay': 'Length of stay', 'about_renter': 'About Renter', 'renter_description': 'Renter Description', 'roommate_preferences': 'Roommate Preferences', 'email': 'Email'})
 class UpdateRentersData(Resource):
-    @api.response(200, 'Success')
-    @api.response(403, 'Not Authorized')
-    @api.expect(renters_resource)
+    @users_api.response(200, 'Success')
+    @users_api.response(403, 'Not Authorized')
+    @users_api.expect(renters_resource)
     def put(self):
         if request.get_json():
             api_token = request.headers['API-TOKEN']
@@ -378,11 +401,11 @@ class UpdateRentersData(Resource):
 houseowners_resource = api.parser()
 houseowners_resource.add_argument('API-TOKEN', location='headers')
 @users_api.route('/update-houseowners-data')
-@api.doc(params={'accommodation_for': 'Looking for a place for', 'accommodation_wanted_applicants': 'data{}', 'teamup': 'Share house together', 'where_to_live': 'Location', 'max_budget': 'Max budget', 'move_date': 'Move Date', 'preferred_length_of_stay': 'Length of stay', 'about_renter': 'About Renter', 'renter_description': 'Renter Description', 'roommate_preferences': 'Roommate Preferences', 'email': 'Email'})
+@users_api.doc(params={'accommodation_for': 'Looking for a place for', 'accommodation_wanted_applicants': 'data{}', 'teamup': 'Share house together', 'where_to_live': 'Location', 'max_budget': 'Max budget', 'move_date': 'Move Date', 'preferred_length_of_stay': 'Length of stay', 'about_renter': 'About Renter', 'renter_description': 'Renter Description', 'roommate_preferences': 'Roommate Preferences', 'email': 'Email'})
 class UpdateHouseownersData(Resource):
-    @api.response(200, 'Success')
-    @api.response(403, 'Not Authorized')
-    @api.expect(houseowners_resource)
+    @users_api.response(200, 'Success')
+    @users_api.response(403, 'Not Authorized')
+    @users_api.expect(houseowners_resource)
     def put(self):
         if request.get_json():
             api_token = request.headers['API-TOKEN']

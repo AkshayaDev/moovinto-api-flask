@@ -33,6 +33,18 @@ api.namespaces.clear()
 users_api = Namespace('user', description='User related operations')
 api.add_namespace(users_api)
 
+status_codes_model = api.model('HTTP Status codes', {
+    '200': fields.String(title="OK", description="The request was successful."),
+    '201': fields.String(title="Created", description="The resource was successfully created."),
+    '202': fields.String(title="Async created", description="The resource was asynchronously created"),
+    '400': fields.String(title="Bad request", description="Bad request"),
+    '401': fields.String(title="Unauthorized", description="Your API key is invalid"),
+    '402': fields.String(title="Over quota", description="Over plan quota on this endpoint"),
+    '404': fields.String(title="Not found", description="The resource does not exist"),
+    '422': fields.String(title="Validation error", description="A validation error occurred"),
+    '50X': fields.String(title="Internal Server Error", description="An error occurred with our API"),
+})
+
 login_model = api.model('Login', {
     'email': fields.String(description="User Email", required=True),
     'password': fields.String(description="User Password", required=True),
@@ -136,6 +148,7 @@ class Register(Resource):
                             "firstname": "",
                             "lastname": "",
                             "email": email,
+                            "phone": "",
                             "password": pwhashed,
                             "api_token": api_token,
                             "user_type": "",
@@ -216,6 +229,7 @@ update_user_model = api.model('Update User', {
     'firstname': fields.String(description="Firstname"),
     'lastname': fields.String(description="Lastname"),
     'email': fields.String(description="Email"),
+    'phone': fields.String(description="Phone"),
     'usertype': fields.String(description="User Type"),
     'userstatus': fields.String(description="User Status"),
     'password': fields.String(description="Password"),
@@ -235,6 +249,7 @@ class UpdateUser(Resource):
             firstname = data['firstname']
             lastname = data['lastname']
             email = data['email']
+            phone = data['phone']
             usertype = data['usertype']
             userstatus = data['userstatus']
             password = data['password']
@@ -258,6 +273,9 @@ class UpdateUser(Resource):
 
                     if lastname:
                         update_user['lastname'] = lastname
+
+                    if phone:
+                        update_user['phone'] = phone
 
                     if email:
                         try:
@@ -288,6 +306,7 @@ class UpdateUser(Resource):
                             "firstname": registered_user['firstname'],
                             "lastname": registered_user['lastname'],
                             "email": registered_user['email'],
+                            "phone": registered_user['phone'],
                             "user_type": registered_user['user_type']
                         }
                     else:
@@ -483,18 +502,31 @@ api.add_namespace(property_api)
 property_resource = api.parser()
 property_resource.add_argument('API-TOKEN', location='headers')
 
+room_images_model = api.model('Images', {
+    'url': fields.String
+})
+
+room_details_model = api.model('Room Details', {
+    'description': fields.String(description="Description"),
+    'facilities': fields.String(description="Room facilities"),
+    'images': fields.Nested(room_images_model)
+})
 
 add_property_model = api.model('Add Property', {
     'name': fields.String(description="Name"),
     'status': fields.String(description="Status"),
     'address': fields.String(description="Address"),
+    'country_code': fields.String(description="Country Code"),
+    'state_county_code': fields.String(description="State Code"),
+    'city': fields.String(description="City"),
+    'zip_code': fields.String(description="Zip Code"),
+    'lat': fields.String(description="Latitude"),
+    'lng': fields.String(description="Longitude"),
     'typeofproperty': fields.String(description="Type of property"),
-    'number_of_bedrooms': fields.String(description="Number of bedrooms"),
-    'number_of_bathrooms': fields.String(description="Number ofbathrooms"),
     'number_of_flatmates': fields.String(description="Number of flatmates"),
     'internet_access': fields.String(description="Internet access"),
     'parking': fields.String(description="Parking"),
-    'room_details': fields.String(description="Room details"),
+    'room_details': fields.List(fields.Nested(room_details_model)),
     'description': fields.String(description="Description"),
 })
 

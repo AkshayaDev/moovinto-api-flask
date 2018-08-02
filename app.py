@@ -16,6 +16,7 @@ database = client['moovintodb']
 users = database['users']
 renters = database['renters']
 houseowners = database['houseowners']
+properties = database['properties']
 
 app = Flask(__name__, template_folder='templates')
 # Setup the Flask-JWT-Extended extension
@@ -507,9 +508,10 @@ room_images_model = api.model('Images', {
 })
 
 room_details_model = api.model('Room Details', {
+    'room_id': fields.String(description="Room ID"),
     'description': fields.String(description="Description"),
     'facilities': fields.String(description="Room facilities"),
-    'images': fields.Nested(room_images_model)
+    'images': fields.List(fields.Nested(room_images_model))
 })
 
 add_property_model = api.model('Add Property', {
@@ -531,13 +533,52 @@ add_property_model = api.model('Add Property', {
 })
 
 @property_api.route('/add')
-@property_api.expect(property_resource)
+@property_api.expect(property_resource, validate=True)
 class UpdateRentersData(Resource):
     @property_api.response(200, 'Success')
     @property_api.response(403, 'Not Authorized')
     @property_api.expect(add_property_model)
     def post(self):
-        pass
+        if request.get_json():
+            api_token = request.headers['API-TOKEN']
+            data = request.get_json()
+
+            if not api_token:
+                return make_response(jsonify({"success": "false", "status_code": 403, "payload": {},
+                                              "error": {"message": "Unauthorized"}}), 403)
+
+            # check api token exists in db
+            register_user = users.find_one({"api_token": api_token})
+
+            if register_user:
+                new_property_id = database.properties.count() + 1
+                newproperty = {
+                    "name": data['name'],
+                    "property_id": new_property_id,
+                    "email": register_user['email'],
+                    "status": data['status'],
+                    "address": data['address'],
+                    "country_code": data['country_code'],
+                    "state_county_code": data['state_county_code'],
+                    "city": data['city'],
+                    "zip_code": data['zip_code'],
+                    "lat": data['lat'],
+                    "lng": data['lng'],
+                    "typeofproperty": data['typeofproperty'],
+                    "number_of_flatmates": data['number_of_flatmates'],
+                    "internet_access": data['internet_access'],
+                    "parking": data['parking'],
+                    "description": data['description'],
+                }
+                database.properties.insert_one(newproperty)
+                return make_response(jsonify({"success": "true", "status_code": 200, "payload": newproperty}), 200)
+            else:
+                return make_response(jsonify({"success": "false", "status_code": 403, "payload": {},
+                                              "error": {"message": "Unauthorized"}}), 403)
+
+        else:
+            return make_response(jsonify({"success": "false", "status_code": 403, "payload": {},
+                                      "error": {"message": "Unauthorized"}}), 403)
 
 if __name__ == '__main__':
     app.run(debug=True)

@@ -392,10 +392,13 @@ class ResetPassword(Resource):
 renters_resource = api.parser()
 renters_resource.add_argument('API-TOKEN', location='headers', required=True)
 
+roommate_preferences_model = api.model('Roommate Preferences', {
+    'key': fields.String
+})
 
 update_renter_model = api.model('Update Renter', {
-    'accommodation_for': fields.String(description="Looking for a place for"),
-    'accommodation_wanted_applicants': fields.String(description="data{}"),
+#    'accommodation_for': fields.String(description="Looking for a place for"),
+#    'accommodation_wanted_applicants': fields.String(description="data{}"),
     'teamup': fields.String(description="Share house together"),
     'where_to_live': fields.String(description="Location"),
     'max_budget': fields.String(description="Max budget"),
@@ -403,7 +406,7 @@ update_renter_model = api.model('Update Renter', {
     'preferred_length_of_stay': fields.String(description="Length of stay"),
     'about_renter': fields.String(description="About Renter"),
     'renter_description': fields.String(description="Renter Description"),
-    'roommate_preferences': fields.String(description="Roommate Preferences")
+    'roommate_preferences': fields.List(fields.Nested(roommate_preferences_model))
 })
 
 @users_api.route('/update-renters-data')
@@ -431,8 +434,8 @@ class UpdateRentersData(Resource):
                 if check_renter:
                     mongo_id = check_renter['_id']
                     update_renter = {
-                        "accommodation_for": data['accommodation_for'],
-                        "accommodation_wanted_applicants": data['accommodation_wanted_applicants'],
+                       # "accommodation_for": data['accommodation_for'],
+                       # "accommodation_wanted_applicants": data['accommodation_wanted_applicants'],
                         "teamup": data['teamup'],
                         "where_to_live": data['where_to_live'],
                         "max_budget": data['max_budget'],
@@ -446,8 +449,8 @@ class UpdateRentersData(Resource):
                     return make_response(jsonify({"success": "true", "status_code": 200, "payload": update_renter}), 200)
                 else:
                     newrenter = {
-                        "accommodation_for": data['accommodation_for'],
-                        "accommodation_wanted_applicants": data['accommodation_wanted_applicants'],
+                       # "accommodation_for": data['accommodation_for'],
+                       # "accommodation_wanted_applicants": data['accommodation_wanted_applicants'],
                         "teamup": data['teamup'],
                         "where_to_live": data['where_to_live'],
                         "max_budget": data['max_budget'],
@@ -470,16 +473,25 @@ class UpdateRentersData(Resource):
                                       "error": {"message": "Unauthorized"}}), 403)
 
 
+renter_preferences_model = api.model('Renters Preferences', {
+    'key': fields.String
+})
+
+update_houseowner_model = api.model('Update House Owner', {
+    'about_houseowner': fields.String(description="About House Owner"),
+    'houseowner_description': fields.String(description="House Owner Description"),
+    'renter_preferences': fields.List(fields.Nested(renter_preferences_model)),
+    'property_id': fields.Integer(description="Property ID")
+})
 
 houseowners_resource = api.parser()
 houseowners_resource.add_argument('API-TOKEN', location='headers', required=True)
 @users_api.route('/update-houseowners-data')
 @users_api.doc(security='apikey')
-@users_api.doc(params={'accommodation_for': 'Looking for a place for', 'accommodation_wanted_applicants': 'data{}', 'teamup': 'Share house together', 'where_to_live': 'Location', 'max_budget': 'Max budget', 'move_date': 'Move Date', 'preferred_length_of_stay': 'Length of stay', 'about_renter': 'About Renter', 'renter_description': 'Renter Description', 'roommate_preferences': 'Roommate Preferences', 'email': 'Email'})
 class UpdateHouseownersData(Resource):
     @users_api.response(200, 'Success')
     @users_api.response(403, 'Not Authorized')
-    @users_api.expect(houseowners_resource)
+    @users_api.expect(update_houseowner_model)
     def put(self):
         if request.get_json():
             api_token = request.headers['API-TOKEN']
@@ -496,6 +508,8 @@ class UpdateHouseownersData(Resource):
                 newhouseowner = {
                     "renter_preferences": data['renter_preferences'],
                     "property_id": data['property_id'],
+                    "about_houseowner": data['about_houseowner'],
+                    "houseowner_description": data['houseowner_description'],
                     "email": register_user['email']
                 }
                 database.renters.insert_one(newhouseowner)

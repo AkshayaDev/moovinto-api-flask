@@ -8,6 +8,8 @@ from flask_jwt_extended import (
     get_jwt_identity
 )
 import pymongo
+from bson import json_util
+import json
 import bcrypt
 
 uri = "mongodb://127.0.0.1:27017"
@@ -23,11 +25,19 @@ app = Flask(__name__, template_folder='templates')
 app.config['JWT_SECRET_KEY'] = 'super-unique-secret'  # Change this!
 jwt = JWTManager(app)
 mail = Mail(app)
-app.config.SWAGGER_UI_DOC_EXPANSION = 'none'
+app.config.SWAGGER_UI_DOC_EXPANSION = 'list'
 app.config.SWAGGER_UI_OPERATION_ID = True
 app.config.SWAGGER_UI_REQUEST_DURATION = True
 api = Api(app, version='1.0', title='MoovInto API',
     description='A sample API for MoovInto')
+
+authorizations = {
+    'apikey': {
+        'type': 'apiKey',
+        'in': 'header',
+        'name': 'API-TOKEN'
+    }
+}
 
 api.namespaces.clear()
 
@@ -180,11 +190,11 @@ class Register(Resource):
 
 
 get_user_parser = api.parser()
-get_user_parser.add_argument('API-TOKEN', location='headers')
+get_user_parser.add_argument('API-TOKEN', location='headers', required=True)
 get_user_parser.add_argument('user_id', type=int, location='args')
 
 @users_api.route('/<int:user_id>')
-@users_api.header('API-TOKEN', 'User Api Token', required=True)
+@users_api.doc(security='apikey')
 @users_api.expect(get_user_parser, validate=True)
 class User(Resource):
     @users_api.response(200, 'Success')
@@ -224,7 +234,7 @@ class User(Resource):
 
 
 update_user_parser = api.parser()
-update_user_parser.add_argument('API-TOKEN', location='headers')
+update_user_parser.add_argument('API-TOKEN', location='headers', required=True)
 
 update_user_model = api.model('Update User', {
     'firstname': fields.String(description="Firstname"),
@@ -237,7 +247,7 @@ update_user_model = api.model('Update User', {
 })
 
 @users_api.route('/update-user')
-@users_api.header('API-TOKEN', 'User Api Token', required=True)
+@users_api.doc(security='apikey')
 @users_api.expect(update_user_parser, validate=True)
 class UpdateUser(Resource):
     @users_api.response(200, 'Success')
@@ -380,7 +390,7 @@ class ResetPassword(Resource):
 
 
 renters_resource = api.parser()
-renters_resource.add_argument('API-TOKEN', location='headers')
+renters_resource.add_argument('API-TOKEN', location='headers', required=True)
 
 
 update_renter_model = api.model('Update Renter', {
@@ -397,6 +407,7 @@ update_renter_model = api.model('Update Renter', {
 })
 
 @users_api.route('/update-renters-data')
+@users_api.doc(security='apikey')
 @users_api.expect(renters_resource, validate=True)
 class UpdateRentersData(Resource):
     @users_api.response(200, 'Success')
@@ -461,8 +472,9 @@ class UpdateRentersData(Resource):
 
 
 houseowners_resource = api.parser()
-houseowners_resource.add_argument('API-TOKEN', location='headers')
+houseowners_resource.add_argument('API-TOKEN', location='headers', required=True)
 @users_api.route('/update-houseowners-data')
+@users_api.doc(security='apikey')
 @users_api.doc(params={'accommodation_for': 'Looking for a place for', 'accommodation_wanted_applicants': 'data{}', 'teamup': 'Share house together', 'where_to_live': 'Location', 'max_budget': 'Max budget', 'move_date': 'Move Date', 'preferred_length_of_stay': 'Length of stay', 'about_renter': 'About Renter', 'renter_description': 'Renter Description', 'roommate_preferences': 'Roommate Preferences', 'email': 'Email'})
 class UpdateHouseownersData(Resource):
     @users_api.response(200, 'Success')
@@ -501,7 +513,7 @@ property_api = Namespace('property', description='Property related operations')
 api.add_namespace(property_api)
 
 property_resource = api.parser()
-property_resource.add_argument('API-TOKEN', location='headers')
+property_resource.add_argument('API-TOKEN', location='headers', required=True)
 
 room_images_model = api.model('Images', {
     'url': fields.String
@@ -521,7 +533,7 @@ add_property_model = api.model('Add Property', {
     'country_code': fields.String(description="Country Code"),
     'state_county_code': fields.String(description="State Code"),
     'city': fields.String(description="City"),
-    'zip_code': fields.String(description="Zip Code"),
+    'zip_code': fields.Integer(description="Zip Code"),
     'lat': fields.String(description="Latitude"),
     'lng': fields.String(description="Longitude"),
     'typeofproperty': fields.String(description="Type of property"),
@@ -533,6 +545,7 @@ add_property_model = api.model('Add Property', {
 })
 
 @property_api.route('/add')
+@property_api.doc(security='apikey')
 @property_api.expect(property_resource, validate=True)
 class UpdateRentersData(Resource):
     @property_api.response(200, 'Success')
@@ -569,9 +582,11 @@ class UpdateRentersData(Resource):
                     "internet_access": data['internet_access'],
                     "parking": data['parking'],
                     "description": data['description'],
+                    "room_details": data['room_details']
                 }
                 database.properties.insert_one(newproperty)
-                return make_response(jsonify({"success": "true", "status_code": 200, "payload": newproperty}), 200)
+                # print(dumps(newproperty))
+                return make_response(jsonify({"success": "true", "status_code": 200, "payload": json.loads(json_util.dumps(newproperty))}), 200)
             else:
                 return make_response(jsonify({"success": "false", "status_code": 403, "payload": {},
                                               "error": {"message": "Unauthorized"}}), 403)
@@ -579,6 +594,62 @@ class UpdateRentersData(Resource):
         else:
             return make_response(jsonify({"success": "false", "status_code": 403, "payload": {},
                                       "error": {"message": "Unauthorized"}}), 403)
+
+
+get_property_parser = api.parser()
+get_property_parser.add_argument('API-TOKEN', location='headers', required=True)
+get_property_parser.add_argument('country_code', type=str, location='args', required=False)
+get_property_parser.add_argument('state_county_code', type=str, location='args', required=False)
+get_property_parser.add_argument('zip_code', type=int, location='args', required=False)
+@property_api.route('/location')
+@property_api.doc(security='apikey')
+@property_api.expect(get_property_parser, validate=True)
+class PropertyLocation(Resource):
+    @property_api.response(200, 'Success')
+    @property_api.response(403, 'Not Authorized')
+    @property_api.response(404, 'Not Found')
+    def get(self):
+        # check Api token exists
+        api_token = request.headers['API-TOKEN']
+        country_code = request.args.get("country_code")
+        state_county_code = request.args.get("state_county_code")
+        zip_code = request.args.get("zip_code")
+        if not api_token:
+            return make_response(jsonify({"success": "false", "status_code": 403, "payload": {},
+                                          "error": {"message": "Unauthorized"}}), 403)
+
+        # check api token exists in db
+        register_user = users.find_one({"api_token": api_token})
+
+        if register_user:
+            location_search_data = {}
+
+            if country_code:
+                location_search_data['country_code'] = country_code
+
+            if state_county_code:
+                location_search_data['state_county_code'] = state_county_code
+
+            if zip_code:
+                location_search_data['zip_code'] = zip_code
+
+
+            # find property with provided data
+            location_data = properties.find(location_search_data)
+
+            if location_data:
+                return make_response(jsonify(
+                    {"success": "true", "status_code": 200, "payload": json.loads(json_util.dumps(location_data))}), 200)
+
+            else:
+                return make_response(jsonify({"success": "false", "status_code": 404, "payload": {},
+                                              "error": {"message": "Not found"}}), 404)
+
+        else:
+            return make_response(jsonify({"success": "false", "status_code": 403, "payload": {},
+                                      "error": {"message": "Unauthorized"}}), 403)
+
+
 
 if __name__ == '__main__':
     app.run(debug=True)

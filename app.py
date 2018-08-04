@@ -56,6 +56,21 @@ status_codes_model = api.model('HTTP Status codes', {
     '50X': fields.String(title="Internal Server Error", description="An error occurred with our API"),
 })
 
+# Property amenities details model
+amenity_details_model = api.model('Amenity details',{
+    'parking': fields.Boolean(description="Parking"),
+    'internet_access': fields.Boolean(description="Internet Access"),
+    'balcony': fields.Boolean(description="Balcony"),
+    'air_conditioning': fields.Boolean(description="Air Conditioning"),
+})
+
+# Property rules model
+property_rules_model = api.model('Property Rules',{
+    'smoking_allowed': fields.Boolean(description="Smoking Allowed"),
+    'pets_allowed': fields.Boolean(description="Pets Allowed"),
+    'couples_allowed': fields.Boolean(description="Couples Allowed"),
+})
+
 login_model = api.model('Login', {
     'email': fields.String(description="User Email", required=True),
     'password': fields.String(description="User Password", required=True),
@@ -392,21 +407,42 @@ class ResetPassword(Resource):
 renters_resource = api.parser()
 renters_resource.add_argument('API-TOKEN', location='headers', required=True)
 
+flatmates_looking_model = api.model('Looking For', {
+    'student': fields.Boolean,
+    'professional': fields.Boolean,
+    'other': fields.String
+})
+
 roommate_preferences_model = api.model('Roommate Preferences', {
-    'key': fields.String
+    'looking_for': fields.Nested(flatmates_looking_model),
+    'smoker': fields.Boolean,
+    'cleaning_habits': fields.List(fields.String),
+})
+
+property_preferences_model = api.model('Property Preferences', {
+    'property_type': fields.List(fields.String),
+    'no_of_bedrooms': fields.List(fields.Integer),
+    'no_of_bathrooms': fields.List(fields.Integer),
+    'amenities_required': fields.List(fields.Nested(amenity_details_model)),
+    'property_rules': fields.List(fields.Nested(property_rules_model)),
+})
+
+location_model = api.model('Location', {
+    'country_code': fields.String(description="Country code"),
+    'state_county_code': fields.String(description="State/County code"),
+    'city': fields.String(description="City")
 })
 
 update_renter_model = api.model('Update Renter', {
-#    'accommodation_for': fields.String(description="Looking for a place for"),
-#    'accommodation_wanted_applicants': fields.String(description="data{}"),
-    'teamup': fields.String(description="Share house together"),
-    'where_to_live': fields.String(description="Location"),
+    'teamup': fields.Boolean(description="Share house together"),
+    'where_to_live': fields.Nested(location_model),
     'max_budget': fields.String(description="Max budget"),
     'move_date': fields.String(description="Move Date"),
     'preferred_length_of_stay': fields.String(description="Length of stay"),
     'about_renter': fields.String(description="About Renter"),
     'renter_description': fields.String(description="Renter Description"),
-    'roommate_preferences': fields.List(fields.Nested(roommate_preferences_model))
+    'roommate_preferences': fields.List(fields.Nested(roommate_preferences_model)),
+    'property_preferences': fields.Nested(property_preferences_model)
 })
 
 @users_api.route('/update-renters-data')
@@ -434,23 +470,6 @@ class UpdateRentersData(Resource):
                 if check_renter:
                     mongo_id = check_renter['_id']
                     update_renter = {
-                       # "accommodation_for": data['accommodation_for'],
-                       # "accommodation_wanted_applicants": data['accommodation_wanted_applicants'],
-                        "teamup": data['teamup'],
-                        "where_to_live": data['where_to_live'],
-                        "max_budget": data['max_budget'],
-                        "move_date": data['move_date'],
-                        "preferred_length_of_stay": data['preferred_length_of_stay'],
-                        "about_renter": data['about_renter'],
-                        "renter_description": data['renter_description'],
-                        "roommate_preferences": data['roommate_preferences']
-                    }
-                    renters.find_one_and_update({"_id": mongo_id}, {"$set": update_renter})
-                    return make_response(jsonify({"success": "true", "status_code": 200, "payload": update_renter}), 200)
-                else:
-                    newrenter = {
-                       # "accommodation_for": data['accommodation_for'],
-                       # "accommodation_wanted_applicants": data['accommodation_wanted_applicants'],
                         "teamup": data['teamup'],
                         "where_to_live": data['where_to_live'],
                         "max_budget": data['max_budget'],
@@ -459,6 +478,22 @@ class UpdateRentersData(Resource):
                         "about_renter": data['about_renter'],
                         "renter_description": data['renter_description'],
                         "roommate_preferences": data['roommate_preferences'],
+                        "property_preferences": data['property_preferences'],
+                        "email": check_renter['email']
+                    }
+                    renters.find_one_and_update({"_id": mongo_id}, {"$set": update_renter})
+                    return make_response(jsonify({"success": "true", "status_code": 200, "payload": update_renter}), 200)
+                else:
+                    newrenter = {
+                        "teamup": data['teamup'],
+                        "where_to_live": data['where_to_live'],
+                        "max_budget": data['max_budget'],
+                        "move_date": data['move_date'],
+                        "preferred_length_of_stay": data['preferred_length_of_stay'],
+                        "about_renter": data['about_renter'],
+                        "renter_description": data['renter_description'],
+                        "roommate_preferences": data['roommate_preferences'],
+                        "property_preferences": data['property_preferences'],
                         "email": register_user['email']
                     }
                     database.renters.insert_one(newrenter)
@@ -472,7 +507,7 @@ class UpdateRentersData(Resource):
             return make_response(jsonify({"success": "false", "status_code": 403, "payload": {},
                                       "error": {"message": "Unauthorized"}}), 403)
 
-
+"""
 renter_preferences_model = api.model('Renters Preferences', {
     'key': fields.String
 })
@@ -488,6 +523,7 @@ houseowners_resource = api.parser()
 houseowners_resource.add_argument('API-TOKEN', location='headers', required=True)
 @users_api.route('/update-houseowners-data')
 @users_api.doc(security='apikey')
+@users_api.expect(houseowners_resource, validate=True)
 class UpdateHouseownersData(Resource):
     @users_api.response(200, 'Success')
     @users_api.response(403, 'Not Authorized')
@@ -522,6 +558,7 @@ class UpdateHouseownersData(Resource):
             return make_response(jsonify({"success": "false", "status_code": 403, "payload": {},
                                       "error": {"message": "Unauthorized"}}), 403)
 
+"""
 
 property_api = Namespace('property', description='Property related operations')
 api.add_namespace(property_api)
@@ -529,15 +566,11 @@ api.add_namespace(property_api)
 property_resource = api.parser()
 property_resource.add_argument('API-TOKEN', location='headers', required=True)
 
-room_images_model = api.model('Images', {
-    'url': fields.String
-})
-
 room_details_model = api.model('Room Details', {
-    'room_id': fields.String(description="Room ID"),
+    'room_id': fields.Integer(description="Room ID"),
     'description': fields.String(description="Description"),
-    'facilities': fields.String(description="Room facilities"),
-    'images': fields.List(fields.Nested(room_images_model))
+    'facilities': fields.List(fields.String),
+    'images': fields.List(fields.Url),
 })
 
 add_property_model = api.model('Add Property', {
@@ -551,9 +584,12 @@ add_property_model = api.model('Add Property', {
     'lat': fields.String(description="Latitude"),
     'lng': fields.String(description="Longitude"),
     'typeofproperty': fields.String(description="Type of property"),
+    'price': fields.Integer(description="Price"),
     'number_of_flatmates': fields.String(description="Number of flatmates"),
-    'internet_access': fields.String(description="Internet access"),
-    'parking': fields.String(description="Parking"),
+    'amenities': fields.List(fields.Nested(amenity_details_model)),
+    'property_rules': fields.List(fields.Nested(property_rules_model)),
+    'total_bedrooms': fields.Integer(description="Total Bedrooms"),
+    'total_bathrooms': fields.Integer(description="Total Bathrooms"),
     'room_details': fields.List(fields.Nested(room_details_model)),
     'description': fields.String(description="Description"),
 })
@@ -584,6 +620,7 @@ class UpdateRentersData(Resource):
                     "property_id": new_property_id,
                     "email": register_user['email'],
                     "status": data['status'],
+                    "price": data['price'],
                     "address": data['address'],
                     "country_code": data['country_code'],
                     "state_county_code": data['state_county_code'],
@@ -592,9 +629,11 @@ class UpdateRentersData(Resource):
                     "lat": data['lat'],
                     "lng": data['lng'],
                     "typeofproperty": data['typeofproperty'],
+                    "total_bedrooms": data['total_bedrooms'],
+                    "total_bathrooms": data['total_bathrooms'],
                     "number_of_flatmates": data['number_of_flatmates'],
-                    "internet_access": data['internet_access'],
-                    "parking": data['parking'],
+                    "amenities": data['amenities'],
+                    "property_rules": data['property_rules'],
                     "description": data['description'],
                     "room_details": data['room_details']
                 }

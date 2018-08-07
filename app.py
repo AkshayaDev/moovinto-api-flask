@@ -81,6 +81,8 @@ class Login(Resource):
     @users_api.response(200, 'Success')
     @users_api.response(401, 'Not Authorized')
     @users_api.response(400, 'Validation error')
+    @users_api.response(404, 'Not found')
+    @users_api.response(406, 'Not Acceptable')
     @users_api.expect(login_model, validate=True)
     def post(self):
         if request.get_json():
@@ -102,8 +104,8 @@ class Login(Resource):
                     email = v["email"]  # replace with normalized form
                 except EmailNotValidError as e:
                     # email is not valid, exception message is human-readable
-                    return make_response(jsonify({"success": "false", "status_code": 403, "payload": {},
-                                                  "error": {"message": str(e)}}), 403)
+                    return make_response(jsonify({"success": "false", "status_code": 400, "payload": {},
+                                                  "error": {"message": str(e)}}), 400)
 
             login_user = users.find_one({ "email" : email })
 
@@ -116,19 +118,24 @@ class Login(Resource):
                     users.find_one_and_update({"_id": mongo_id},{"$set": {"api_token": access_token}})
                     login_payload = {
                         "user_id": login_user['user_id'],
+                        "email": login_user['email'],
+                        "firstname": login_user['firstname'],
+                        "lastname": login_user['lastname'],
+                        "user_type": login_user['user_type'],
+                        "user_status": login_user['user_status'],
                         "api_token": access_token
                     }
                     return make_response(jsonify({"success": "true","status_code": 200, "payload": login_payload}))
                 else:
                     return make_response(jsonify({"success": "false", "status_code": 401, "payload": {},
-                            "error": {"message": "Unauthorized"}}), 401)
+                            "error": {"message": "Invalid credentials"}}), 401)
 
             else:
-                return make_response(jsonify({"success": "false", "status_code": 401, "payload": {},
-                        "error": {"message": "Unauthorized"}}), 401)
+                return make_response(jsonify({"success": "false", "status_code": 404, "payload": {},
+                        "error": {"message": "User not found"}}), 404)
         else:
-            return make_response(jsonify({"success": "false", "status_code": 401, "payload": {},
-                    "error": {"message": "Unauthorized"}}), 401)
+            return make_response(jsonify({"success": "false", "status_code": 406, "payload": {},
+                    "error": {"message": "Bad JSON request"}}), 406)
 
 register_model = api.model('Register', {
     'email': fields.String(description="Email", required=True),
@@ -141,6 +148,7 @@ class Register(Resource):
     @users_api.response(200, 'Success')
     @users_api.response(401, 'Not Authorized')
     @users_api.response(400, 'Validation error')
+    @users_api.response(406, 'Not Acceptable')
     @users_api.expect(register_model, validate=True)
     def post(self):
         if request.get_json():
@@ -155,8 +163,8 @@ class Register(Resource):
                     email = v["email"]  # replace with normalized form
                 except EmailNotValidError as e:
                     # email is not valid, exception message is human-readable
-                    return make_response(jsonify({"success": "false", "status_code": 403, "payload": {},
-                                                  "error": {"message": str(e)}}), 403)
+                    return make_response(jsonify({"success": "false", "status_code": 400, "payload": {},
+                                                  "error": {"message": str(e)}}), 400)
 
             if all([email, password, confpassword]):
                 if password == confpassword:
@@ -200,8 +208,12 @@ class Register(Resource):
                             "error": {"message": "Passwords not matched"}}), 400)
 
             else:
-                return make_response(jsonify({"success": "false", "status_code": 401, "payload": {},
-                        "error": {"message": "Unauthorized"}}), 401)
+                return make_response(jsonify({"success": "false", "status_code": 400, "payload": {},
+                        "error": {"message": "Field cannot be empty"}}), 400)
+
+        else:
+            return make_response(jsonify({"success": "false", "status_code": 406, "payload": {},
+                    "error": {"message": "Bad JSON request"}}), 406)
 
 
 get_user_parser = api.parser()

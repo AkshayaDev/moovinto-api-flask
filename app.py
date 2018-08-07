@@ -199,13 +199,18 @@ class Register(Resource):
                         database.users.insert_one(newuser)
                         register_payload = {
                             "user_id": new_user_id,
+                            "email": email,
+                            "firstname": "",
+                            "lastname": "",
+                            "user_type": "",
+                            "user_status": "",
                             "api_token": api_token
                         }
                         return make_response(jsonify({"success": "true", "status_code": 200, "payload": register_payload}), 200)
 
                 else:
-                    return make_response(jsonify({"success": "false", "status_code": 400, "payload": {},
-                            "error": {"message": "Passwords not matched"}}), 400)
+                    return make_response(jsonify({"success": "false", "status_code": 401, "payload": {},
+                            "error": {"message": "Passwords not matched"}}), 401)
 
             else:
                 return make_response(jsonify({"success": "false", "status_code": 400, "payload": {},

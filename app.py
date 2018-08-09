@@ -424,15 +424,9 @@ class ResetPassword(Resource):
 renters_resource = api.parser()
 renters_resource.add_argument('API-TOKEN', location='headers', required=True)
 
-flatmates_looking_model = api.model('Looking For', {
-    'student': fields.Boolean,
-    'professional': fields.Boolean,
-    'other': fields.String
-})
-
 roommate_preferences_model = api.model('Roommate Preferences', {
-    'looking_for': fields.Nested(flatmates_looking_model),
-    'smoker': fields.Boolean,
+    'looking_for': fields.List(fields.String(example="student")),
+    'behaviours': fields.List(fields.String(example="Smoking")),
     'cleaning_habits': fields.List(fields.String),
 })
 
@@ -440,8 +434,8 @@ property_preferences_model = api.model('Property Preferences', {
     'property_type': fields.List(fields.String),
     'no_of_bedrooms': fields.List(fields.Integer),
     'no_of_bathrooms': fields.List(fields.Integer),
-    'amenities_required': fields.List(fields.Nested(amenity_details_model)),
-    'property_rules': fields.List(fields.Nested(property_rules_model)),
+    'amenities_required': fields.List(fields.String(example="Wifi")),
+    'property_rules': fields.List(fields.String(example="Smoking Allowed")),
 })
 
 location_model = api.model('Location', {

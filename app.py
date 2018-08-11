@@ -452,6 +452,9 @@ update_renter_model = api.model('Update Renter', {
     'preferred_length_of_stay': fields.String(description="Length of stay"),
     'about_renter': fields.String(description="About Renter"),
     'renter_description': fields.String(description="Renter Description"),
+    'behaviours': fields.List(fields.String(example="Smoking")),
+    'cleaning_habits': fields.List(fields.String),
+    'profession': fields.String(description="Student"),
     'roommate_preferences': fields.List(fields.Nested(roommate_preferences_model)),
     'property_preferences': fields.Nested(property_preferences_model)
 })
@@ -488,6 +491,9 @@ class UpdateRentersData(Resource):
                         "preferred_length_of_stay": data['preferred_length_of_stay'],
                         "about_renter": data['about_renter'],
                         "renter_description": data['renter_description'],
+                        "behaviours": data['behaviours'],
+                        "cleaning_habits": data['cleaning_habits'],
+                        "profession": data['profession'],
                         "roommate_preferences": data['roommate_preferences'],
                         "property_preferences": data['property_preferences'],
                         "email": check_renter['email']
@@ -503,6 +509,9 @@ class UpdateRentersData(Resource):
                         "preferred_length_of_stay": data['preferred_length_of_stay'],
                         "about_renter": data['about_renter'],
                         "renter_description": data['renter_description'],
+                        "behaviours": data['behaviours'],
+                        "cleaning_habits": data['cleaning_habits'],
+                        "profession": data['profession'],
                         "roommate_preferences": data['roommate_preferences'],
                         "property_preferences": data['property_preferences'],
                         "email": register_user['email']
@@ -713,6 +722,32 @@ class PropertyLocation(Resource):
             return make_response(jsonify({"success": "false", "status_code": 403, "payload": {},
                                       "error": {"message": "Unauthorized"}}), 403)
 
+
+search_api = Namespace('find', description='Search operations')
+api.add_namespace(search_api)
+
+search_resource = api.parser()
+search_resource.add_argument('API-TOKEN', location='headers', required=True)
+
+@search_api.route('/flatmates')
+@search_api.doc(security='apikey')
+@search_api.expect(search_resource, validate=True)
+class FindFlatmates(Resource):
+    @search_api.response(200, 'Success')
+    @search_api.response(403, 'Not Authorized')
+    @search_api.response(404, 'Not Found')
+    def post(self):
+        pass
+
+@search_api.route('/renters')
+@search_api.doc(security='apikey')
+@search_api.expect(search_resource, validate=True)
+class FindRenters(Resource):
+    @search_api.response(200, 'Success')
+    @search_api.response(403, 'Not Authorized')
+    @search_api.response(404, 'Not Found')
+    def post(self):
+        pass
 
 
 if __name__ == '__main__':

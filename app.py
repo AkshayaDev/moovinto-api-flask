@@ -70,13 +70,13 @@ class WelcomeScreen(Resource):
                                           "error": {"message": "Bad Request"}}), 400)
 
         if (screen_id==1):
-            response_payload = dict(screen_id = 1, text = "Screen 1")
+            response_payload = dict(screen_id=1, title="Welcome In", description="Find a home, match a flatmate, schedule a viewing and sign a lease.")
 
         elif (screen_id==2):
-            response_payload = dict(screen_id = 2, text = "Screen 2")
+            response_payload = dict(screen_id=2, title="Set Home Criteria", description="Setup your home preferences. Number of rooms, appliances, house rules and more.")
 
         elif (screen_id==3):
-            response_payload = dict(screen_id = 3, text = "Screen 3")
+            response_payload = dict(screen_id=3, title="Find Flatmates", description="With smart indicators, setup filters and priorities your criteria for the perfect flatmate.")
 
         else:
             return make_response(jsonify({"success": "false", "status_code": 404, "payload": {},
@@ -857,4 +857,4 @@ class FindRenters(Resource):
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='ec2-18-191-161-188.us-east-2.compute.amazonaws.com', port='5000')

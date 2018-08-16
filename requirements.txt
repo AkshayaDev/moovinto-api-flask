@@ -5,3 +5,4 @@ bcrypt==3.1.4
 flask-jwt-extended==3.10.0
 email_validator==1.0.3
 Flask-Mail==0.9.1
+pycountry==18.5.26

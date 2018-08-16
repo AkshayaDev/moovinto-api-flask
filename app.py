@@ -11,6 +11,9 @@ import pymongo
 from bson import json_util
 import json
 import bcrypt
+import pycountry
+import string
+from random import *
 
 uri = "mongodb://127.0.0.1:27017"
 client = pymongo.MongoClient(uri)
@@ -25,6 +28,15 @@ app = Flask(__name__, template_folder='templates')
 app.config['JWT_SECRET_KEY'] = 'super-unique-secret'  # Change this!
 jwt = JWTManager(app)
 mail = Mail(app)
+
+app.config['MAIL_SERVER']='smtp.gmail.com'
+app.config['MAIL_PORT'] = 465
+app.config['MAIL_USERNAME'] = 'moovinto.help@gmail.com'
+app.config['MAIL_PASSWORD'] = 'moovinto123'
+app.config['MAIL_USE_TLS'] = False
+app.config['MAIL_USE_SSL'] = True
+mail = Mail(app)
+
 app.config.SWAGGER_UI_DOC_EXPANSION = 'list'
 app.config.SWAGGER_UI_OPERATION_ID = True
 app.config.SWAGGER_UI_REQUEST_DURATION = True
@@ -41,8 +53,49 @@ authorizations = {
 
 api.namespaces.clear()
 
+general_apis = Namespace('general', description='General Endpoints')
+api.add_namespace(general_apis)
+
 users_api = Namespace('user', description='User related operations')
 api.add_namespace(users_api)
+
+@general_apis.route('/welcome-screen/<int:screen_id>')
+class WelcomeScreen(Resource):
+    @general_apis.response(200, 'Success')
+    @general_apis.response(404, 'Not Found')
+    @general_apis.response(400, 'Bad Request')
+    def get(self, screen_id):
+        if not screen_id:
+            return make_response(jsonify({"success": "false", "status_code": 400, "payload": {},
+                                          "error": {"message": "Bad Request"}}), 400)
+
+        if (screen_id==1):
+            response_payload = dict(screen_id = 1, text = "Screen 1")
+
+        elif (screen_id==2):
+            response_payload = dict(screen_id = 2, text = "Screen 2")
+
+        elif (screen_id==3):
+            response_payload = dict(screen_id = 3, text = "Screen 3")
+
+        else:
+            return make_response(jsonify({"success": "false", "status_code": 404, "payload": {},
+                                          "error": {"message": "Not Found"}}), 404)
+
+        return make_response(jsonify({"success": "true", "status_code": 200, "payload": response_payload}))
+
+
+@general_apis.route('/list-countries')
+class ListCountries(Resource):
+    @general_apis.response(200, 'Success')
+    @general_apis.response(404, 'Not Found')
+    @general_apis.response(400, 'Bad Request')
+    def get(self):
+        # country code list
+        countries = {}
+        for country in pycountry.countries:
+            countries[country.name] = country.alpha_2
+        return make_response(jsonify({"success": "true", "status_code": 200, "payload": {"countries": countries}}))
 
 status_codes_model = api.model('HTTP Status codes', {
     '200': fields.String(title="OK", description="The request was successful."),
@@ -116,14 +169,17 @@ class Login(Resource):
                     # Identity can be any data that is json serializable
                     access_token = create_access_token(identity = login_user['email'])
                     users.find_one_and_update({"_id": mongo_id},{"$set": {"api_token": access_token}})
-                    login_payload = {
+                    user_dict = {
                         "user_id": login_user['user_id'],
                         "email": login_user['email'],
                         "firstname": login_user['firstname'],
                         "lastname": login_user['lastname'],
                         "user_type": login_user['user_type'],
                         "user_status": login_user['user_status'],
-                        "api_token": access_token
+                    }
+                    login_payload = {
+                        "api_token": access_token,
+                        "user": user_dict
                     }
                     return make_response(jsonify({"success": "true","status_code": 200, "payload": login_payload}))
                 else:
@@ -197,14 +253,17 @@ class Register(Resource):
                         # database.users.create_index([('username', pymongo.ASCENDING)],unique = True)
                         # database.users.create_index([('user_id', pymongo.ASCENDING)],unique = True)
                         database.users.insert_one(newuser)
-                        register_payload = {
+                        user_dict = {
                             "user_id": new_user_id,
                             "email": email,
                             "firstname": "",
                             "lastname": "",
                             "user_type": "",
                             "user_status": "",
-                            "api_token": api_token
+                        }
+                        register_payload = {
+                            "api_token": api_token,
+                            "user": user_dict
                         }
                         return make_response(jsonify({"success": "true", "status_code": 200, "payload": register_payload}), 200)
 
@@ -410,7 +469,7 @@ class ResetPassword(Resource):
                 msg = Message(subject="MoovInto Password Reset",
                               sender="moovinto@gmail.com",
                               recipients=[email])
-                link = request.url_root + "?resetkey=" + reset_key
+                link = request.url_root + "reset-password-verify/?resetkey=" + reset_key + "&email=" + email
                 msg.html = render_template('/mails/reset-password.html', link=link)
                 mail.send(msg)
                 return make_response(
@@ -420,6 +479,53 @@ class ResetPassword(Resource):
                 return make_response(jsonify({"success": "false", "status_code": 403, "payload": {},
                                           "error": {"message": "Unauthorized"}}), 403)
 
+
+reset_password_verify_parser = api.parser()
+reset_password_verify_parser.add_argument('resetkey', type=str, location='args', required=True)
+reset_password_verify_parser.add_argument('email', type=str, location='args', required=True)
+
+@users_api.route('/reset-password-verify')
+@users_api.expect(reset_password_verify_parser, validate=True)
+class ResetPasswordVerify(Resource):
+    @users_api.response(200, 'Success')
+    @users_api.response(403, 'Not Authorized')
+    def get(self):
+        resetkey = request.args.get("resetkey")
+        email = request.args.get("email")
+        if not resetkey:
+            return make_response(jsonify({"success": "false", "status_code": 403, "payload": {},
+                                          "error": {"message": "Unauthorized"}}), 403)
+
+        registered_user = users.find_one({"email": email})
+
+        if registered_user:
+            mongo_id = registered_user['_id']
+            pwd_reset_key_db = registered_user['password_reset_key']
+            if (pwd_reset_key_db==resetkey):
+                update_user = {}
+                min_char = 8
+                max_char = 12
+                allchar = string.ascii_letters + string.digits
+                password = "".join(choice(allchar) for x in range(randint(min_char, max_char)))
+                update_user['password'] = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt(14))
+                update_user['password_reset_key'] = ""
+                users.find_one_and_update({"_id": mongo_id}, {"$set": update_user})
+                msg = Message(subject="MoovInto New Password",
+                              sender="moovinto@gmail.com",
+                              recipients=[email])
+                msg.html = render_template('/mails/random-password.html', pwd=password)
+                mail.send(msg)
+                return make_response(
+                    jsonify({"success": "true", "status_code": 200, "payload": {}}), 200)
+
+            else:
+                return make_response(jsonify({"success": "false", "status_code": 403, "payload": {},
+                                              "error": {"message": "Unauthorized"}}), 403)
+
+
+        else:
+            return make_response(jsonify({"success": "false", "status_code": 403, "payload": {},
+                                          "error": {"message": "Unauthorized"}}), 403)
 
 renters_resource = api.parser()
 renters_resource.add_argument('API-TOKEN', location='headers', required=True)

@@ -59,6 +59,20 @@ api.add_namespace(general_apis)
 users_api = Namespace('user', description='User related operations')
 api.add_namespace(users_api)
 
+
+@general_apis.route('/welcome-screen/data')
+class WelcomeScreenData(Resource):
+    @general_apis.response(200, 'Success')
+    @general_apis.response(404, 'Not Found')
+    @general_apis.response(400, 'Bad Request')
+    def get(self):
+        response_payload = {
+            "1": dict(title="Welcome In", description="Find a home, match a flatmate, schedule a viewing and sign a lease."),
+            "2": dict(title="Set Home Criteria", description="Setup your home preferences. Number of rooms, appliances, house rules and more."),
+            "3": dict(title="Find Flatmates", description="With smart indicators, setup filters and priorities your criteria for the perfect flatmate.")
+        }
+        return make_response(jsonify({"success": "true", "status_code": 200, "payload": response_payload}))
+
 @general_apis.route('/welcome-screen/<int:screen_id>')
 class WelcomeScreen(Resource):
     @general_apis.response(200, 'Success')
@@ -857,4 +871,4 @@ class FindRenters(Resource):
 
 
 if __name__ == '__main__':
-    app.run(host='ec2-18-191-161-188.us-east-2.compute.amazonaws.com', port='5000')
+    app.run(host='127.0.0.1', port='5000')

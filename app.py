@@ -15,6 +15,7 @@ import pycountry
 import string
 from random import *
 import us_states_cities
+import api_responses
 
 uri = "mongodb://127.0.0.1:27017"
 client = pymongo.MongoClient(uri)
@@ -64,25 +65,18 @@ api.add_namespace(users_api)
 @general_apis.route('/welcome-screen/data')
 class WelcomeScreenData(Resource):
     @general_apis.response(200, 'Success')
-    @general_apis.response(404, 'Not Found')
-    @general_apis.response(400, 'Bad Request')
     def get(self):
         response_payload = {
             "1": dict(title="Welcome In", description="Find a home, match a flatmate, schedule a viewing and sign a lease."),
             "2": dict(title="Set Home Criteria", description="Setup your home preferences. Number of rooms, appliances, house rules and more."),
             "3": dict(title="Find Flatmates", description="With smart indicators, setup filters and priorities your criteria for the perfect flatmate.")
         }
-        return make_response(jsonify({"success": "true", "status_code": 200, "payload": response_payload}))
+        return api_responses.success_response(response_payload)
 
 @general_apis.route('/welcome-screen/<int:screen_id>')
 class WelcomeScreen(Resource):
     @general_apis.response(200, 'Success')
-    @general_apis.response(404, 'Not Found')
-    @general_apis.response(400, 'Bad Request')
     def get(self, screen_id):
-        if not screen_id:
-            return make_response(jsonify({"success": "false", "status_code": 400, "payload": {},
-                                          "error": {"message": "Bad Request"}}), 400)
 
         if (screen_id==1):
             response_payload = dict(screen_id=1, title="Welcome In", description="Find a home, match a flatmate, schedule a viewing and sign a lease.")
@@ -94,61 +88,78 @@ class WelcomeScreen(Resource):
             response_payload = dict(screen_id=3, title="Find Flatmates", description="With smart indicators, setup filters and priorities your criteria for the perfect flatmate.")
 
         else:
-            return make_response(jsonify({"success": "false", "status_code": 404, "payload": {},
-                                          "error": {"message": "Not Found"}}), 404)
+            return api_responses.error_response("MOOV_ERR_11", api_responses.moovinto_error_codes["MOOV_ERR_11"])
 
-        return make_response(jsonify({"success": "true", "status_code": 200, "payload": response_payload}))
+        return api_responses.success_response(response_payload)
 
 
 @general_apis.route('/list-countries')
 class ListCountries(Resource):
     @general_apis.response(200, 'Success')
-    @general_apis.response(404, 'Not Found')
-    @general_apis.response(400, 'Bad Request')
     def get(self):
         # country code list
         countries = {}
         for country in pycountry.countries:
-            countries[country.name] = country.alpha_2
-        return make_response(jsonify({"success": "true", "status_code": 200, "payload": {"countries": countries}}))
+            countries[country.alpha_2] = country.name
+
+        response_payload = {
+            "countries": countries
+        }
+        return api_responses.success_response(response_payload)
 
 
 @general_apis.route('/us/states')
 class UsStates(Resource):
     @general_apis.response(200, 'Success')
-    @general_apis.response(404, 'Not Found')
-    @general_apis.response(400, 'Bad Request')
     def get(self):
         response_payload = {
             "states": us_states_cities.get_us_states(),
         }
-        return make_response(jsonify({"success": "true", "status_code": 200, "payload": response_payload}))
+        return api_responses.success_response(response_payload)
 
 
 @general_apis.route('/us-cities/<state_code>')
 class UsStatesCities(Resource):
     @general_apis.response(200, 'Success')
-    @general_apis.response(404, 'Not Found')
-    @general_apis.response(400, 'Bad Request')
     def get(self, state_code):
-        passstatecode = state_code.upper()
+        statecode = state_code.upper()
         response_payload = {
-           "cities": us_states_cities.get_us_city_by_state(passstatecode)
+           "cities": us_states_cities.get_us_city_by_state(statecode)
         }
-        return make_response(jsonify({"success": "true", "status_code": 200, "payload": response_payload}))
+        return api_responses.success_response(response_payload)
 
 
-status_codes_model = api.model('HTTP Status codes', {
-    '200': fields.String(title="OK", description="The request was successful."),
-    '201': fields.String(title="Created", description="The resource was successfully created."),
-    '202': fields.String(title="Async created", description="The resource was asynchronously created"),
-    '400': fields.String(title="Bad request", description="Bad request"),
-    '401': fields.String(title="Unauthorized", description="Your API key is invalid"),
-    '402': fields.String(title="Over quota", description="Over plan quota on this endpoint"),
-    '404': fields.String(title="Not found", description="The resource does not exist"),
-    '422': fields.String(title="Validation error", description="A validation error occurred"),
-    '50X': fields.String(title="Internal Server Error", description="An error occurred with our API"),
-})
+@general_apis.route('/current-active-cities')
+class CurrentActiveCities(Resource):
+    @general_apis.response(200, 'Success')
+    def get(self):
+        response_payload = dict(cities=list(('Boston', 'Houstan', 'Los Angeles', 'New York City', 'San Francisco', 'Seattle', 'Washington D.C')))
+        return api_responses.success_response(response_payload)
+
+
+@general_apis.route('/occupations')
+class OccupationsData(Resource):
+    @general_apis.response(200, 'Success')
+    def get(self):
+        response_payload = dict(occupations=list(('accountant', 'actor', 'actress', 'air traffic controller', 'architect',
+                                             'artist', 'attorney', 'banker', 'bartender','barber','bookkeeper','builder')))
+        return api_responses.success_response(response_payload)
+
+
+@general_apis.route('/universities')
+class UniversitiesData(Resource):
+    @general_apis.response(200, 'Success')
+    def get(self):
+        response_payload = dict(universities=list(('Allen University', 'Baker University')))
+        return api_responses.success_response(response_payload)
+
+
+@general_apis.route('/majors')
+class MajorsData(Resource):
+    @general_apis.response(200, 'Success')
+    def get(self):
+        response_payload = dict(majors=list(('Athletic Training', 'Biology', 'Chemistry')))
+        return api_responses.success_response(response_payload)
 
 # Property amenities details model
 amenity_details_model = api.model('Amenity details',{

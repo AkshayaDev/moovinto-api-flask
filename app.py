@@ -14,6 +14,7 @@ import bcrypt
 import pycountry
 import string
 from random import *
+import us_states_cities
 
 uri = "mongodb://127.0.0.1:27017"
 client = pymongo.MongoClient(uri)
@@ -110,6 +111,32 @@ class ListCountries(Resource):
         for country in pycountry.countries:
             countries[country.name] = country.alpha_2
         return make_response(jsonify({"success": "true", "status_code": 200, "payload": {"countries": countries}}))
+
+
+@general_apis.route('/us/states')
+class UsStates(Resource):
+    @general_apis.response(200, 'Success')
+    @general_apis.response(404, 'Not Found')
+    @general_apis.response(400, 'Bad Request')
+    def get(self):
+        response_payload = {
+            "states": us_states_cities.get_us_states(),
+        }
+        return make_response(jsonify({"success": "true", "status_code": 200, "payload": response_payload}))
+
+
+@general_apis.route('/us-cities/<state_code>')
+class UsStatesCities(Resource):
+    @general_apis.response(200, 'Success')
+    @general_apis.response(404, 'Not Found')
+    @general_apis.response(400, 'Bad Request')
+    def get(self, state_code):
+        passstatecode = state_code.upper()
+        response_payload = {
+           "cities": us_states_cities.get_us_city_by_state(passstatecode)
+        }
+        return make_response(jsonify({"success": "true", "status_code": 200, "payload": response_payload}))
+
 
 status_codes_model = api.model('HTTP Status codes', {
     '200': fields.String(title="OK", description="The request was successful."),

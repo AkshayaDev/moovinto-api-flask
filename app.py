@@ -141,8 +141,7 @@ class CurrentActiveCities(Resource):
 class OccupationsData(Resource):
     @general_apis.response(200, 'Success')
     def get(self):
-        response_payload = dict(occupations=list(('accountant', 'actor', 'actress', 'air traffic controller', 'architect',
-                                             'artist', 'attorney', 'banker', 'bartender','barber','bookkeeper','builder')))
+        response_payload = dict(occupations=list(('accountant','actor','actress','air traffic controller','architect','artist','attorney','banker','bartender','barber','bookkeeper','builder','businessman','businesswoman','businessperson','butcher','carpenter','cashier','chef','coach','dental hygienist','dentist','designer','developer','dietician','doctor','economist','editor','electrician','engineer','farmer','filmmaker','fisherman','flight attendant','jeweler','judge','lawyer','mechanic','musician','nutritionist','nurse','optician','painter','pharmacist','photographer','physician','physicians assistant','pilot','plumber','police officer','politician','professor','programmer','psychologist','receptionist','salesman','salesperson','saleswoman','secretary','singer','surgeon','teacher','therapist','translator','translator','undertaker','veterinarian','videographer','waiter','waitress','writer')))
         return api_responses.success_response(response_payload)
 
 
@@ -158,7 +157,7 @@ class UniversitiesData(Resource):
 class MajorsData(Resource):
     @general_apis.response(200, 'Success')
     def get(self):
-        response_payload = dict(majors=list(('Athletic Training', 'Biology', 'Chemistry')))
+        response_payload = dict(majors=list(('Athletic Training','Biology','Chemistry','Environmental Science','Exercise Sci/Kinesiology','Fisheries and Wildlife','Food Science','Forest Management','Marine Science','Nursing (RN/BSN)','Organic/Urban Farming','Pharmacy','Physicians Assistant','Pre - Dental','Pre - Medical','Pre - Veterinary Medicine','Apparel/Textile Design','Architecture','Dance','Film/Broadcast','Fine/Studio Art','Graphic Design','Industrial Design','Interior Design','Landscape Architecture','Music','Theatre','Urban Planning','Video Game Design','Web Design/Digital Media','Arts Management','Education','Emergency Management','English/Writing','Equine Science/Mgmt','Family & Child Science','History','Journalism','Language Studies','Non-Profit Management','Peace/Conflict Studies','Philosophy','Political Science','Social Science','Sports Turf/Golf Mgmt','Women/Gender Studies','Aerospace Engineering','Astronomy','Aviation/Aeronautics','Biomedical Engineering','Chemical Engineering','Civil Engineering','Computer Science','Electrical Engineering','Energy Science','Engineering','Imaging Science','Industrial Engineering','Industrial Technology','Materials Science','Mathematics','Mechanical Engineering','Accounting - General','Business - General','Construction Management','Finance & Economics','Hospitality Management','Human Resources Mgmt','Information Systems (MIS)','Insurance & Risk Mgmt','National Parks Management','Public Health Administration','Sport Management','Supply Chain Mgmt (Logistics)')))
         return api_responses.success_response(response_payload)
 
 # Property amenities details model
@@ -196,12 +195,10 @@ class Login(Resource):
             password = data['password']
 
             if not email:
-                return make_response(jsonify({"success": "false", "status_code": 400, "payload": {},
-                        "error": {"message": "Field cannot be empty"}}), 400)
+                return api_responses.error_response("MOOV_ERR_08", api_responses.moovinto_error_codes["MOOV_ERR_08"])
 
             if not password:
-                return make_response(jsonify({"success": "false", "status_code": 400, "payload": {},
-                        "error": {"message": "Field cannot be empty"}}), 400)
+                return api_responses.error_response("MOOV_ERR_08", api_responses.moovinto_error_codes["MOOV_ERR_08"])
 
             if email:
                 try:
@@ -209,8 +206,8 @@ class Login(Resource):
                     email = v["email"]  # replace with normalized form
                 except EmailNotValidError as e:
                     # email is not valid, exception message is human-readable
-                    return make_response(jsonify({"success": "false", "status_code": 400, "payload": {},
-                                                  "error": {"message": str(e)}}), 400)
+                    return api_responses.error_response("MOOV_ERR_05", str(e))
+                    # return make_response(jsonify({"success": "false", "status_code": 400, "payload": {}, "error": {"message": str(e)}}), 400)
 
             login_user = users.find_one({ "email" : email })
 
@@ -233,17 +230,14 @@ class Login(Resource):
                         "api_token": access_token,
                         "user": user_dict
                     }
-                    return make_response(jsonify({"success": "true","status_code": 200, "payload": login_payload}))
+                    return api_responses.success_response(login_payload)
                 else:
-                    return make_response(jsonify({"success": "false", "status_code": 401, "payload": {},
-                            "error": {"message": "Invalid credentials"}}), 401)
+                    return api_responses.error_response("MOOV_ERR_09", api_responses.moovinto_error_codes["MOOV_ERR_09"])
 
             else:
-                return make_response(jsonify({"success": "false", "status_code": 404, "payload": {},
-                        "error": {"message": "User not found"}}), 404)
+                return api_responses.error_response("MOOV_ERR_11", "User not found")
         else:
-            return make_response(jsonify({"success": "false", "status_code": 406, "payload": {},
-                    "error": {"message": "Bad JSON request"}}), 406)
+            return api_responses.error_response("MOOV_ERR_01", api_responses.moovinto_error_codes["MOOV_ERR_01"])
 
 register_model = api.model('Register', {
     'email': fields.String(description="Email", required=True),
@@ -271,15 +265,13 @@ class Register(Resource):
                     email = v["email"]  # replace with normalized form
                 except EmailNotValidError as e:
                     # email is not valid, exception message is human-readable
-                    return make_response(jsonify({"success": "false", "status_code": 400, "payload": {},
-                                                  "error": {"message": str(e)}}), 400)
+                    return api_responses.error_response("MOOV_ERR_05", str(e))
 
             if all([email, password, confpassword]):
                 if password == confpassword:
                     register_user = users.find_one({"email": email})
                     if register_user:
-                        return make_response(jsonify({"success": "false", "status_code": 400, "payload": {},
-                                "error": {"message": "User already exists"}}), 400)
+                        return api_responses.error_response("MOOV_ERR_06", api_responses.moovinto_error_codes["MOOV_ERR_06"])
                     else:
                         pwhashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt(14))
                         api_token = create_access_token(identity=email)
@@ -317,19 +309,16 @@ class Register(Resource):
                             "api_token": api_token,
                             "user": user_dict
                         }
-                        return make_response(jsonify({"success": "true", "status_code": 200, "payload": register_payload}), 200)
+                        return api_responses.success_response(register_payload)
 
                 else:
-                    return make_response(jsonify({"success": "false", "status_code": 401, "payload": {},
-                            "error": {"message": "Passwords not matched"}}), 401)
+                    return api_responses.error_response("MOOV_ERR_07", api_responses.moovinto_error_codes["MOOV_ERR_07"])
 
             else:
-                return make_response(jsonify({"success": "false", "status_code": 400, "payload": {},
-                        "error": {"message": "Field cannot be empty"}}), 400)
+                return api_responses.error_response("MOOV_ERR_08", api_responses.moovinto_error_codes["MOOV_ERR_08"])
 
         else:
-            return make_response(jsonify({"success": "false", "status_code": 406, "payload": {},
-                    "error": {"message": "Bad JSON request"}}), 406)
+            return api_responses.error_response("MOOV_ERR_01", api_responses.moovinto_error_codes["MOOV_ERR_01"])
 
 
 get_user_parser = api.parser()
@@ -346,8 +335,7 @@ class User(Resource):
         # check Api token exists
         api_token = request.headers['API-TOKEN']
         if not api_token:
-            return make_response(jsonify({"success": "false", "status_code": 403, "payload": {},
-                                          "error": {"message": "Unauthorized"}}), 403)
+            return api_responses.error_response("MOOV_ERR_03", api_responses.moovinto_error_codes["MOOV_ERR_03"])
 
         # check api token exists in db
         register_user = users.find_one({"api_token": api_token})
@@ -365,15 +353,12 @@ class User(Resource):
                     "email": register_user['email'],
                     "user_type": register_user['user_type']
                 }
-                return make_response(
-                    jsonify({"success": "true", "status_code": 200, "payload": user_payload}), 200)
+                return api_responses.success_response(user_payload)
             else:
-                return make_response(jsonify({"success": "false", "status_code": 403, "payload": {},
-                                              "error": {"message": "Unauthorized"}}), 403)
+                return api_responses.error_response("MOOV_ERR_10", api_responses.moovinto_error_codes["MOOV_ERR_10"])
 
         else:
-            return make_response(jsonify({"success": "false", "status_code": 403, "payload": {},
-                                          "error": {"message": "Unauthorized"}}), 403)
+            return api_responses.error_response("MOOV_ERR_11", "User not found")
 
 
 update_user_parser = api.parser()
@@ -409,8 +394,7 @@ class UpdateUser(Resource):
             password = data['password']
 
             if not api_token:
-                return make_response(jsonify({"success": "false", "status_code": 403, "payload": {},
-                                              "error": {"message": "Unauthorized"}}), 403)
+                return api_responses.error_response("MOOV_ERR_03", api_responses.moovinto_error_codes["MOOV_ERR_03"])
 
             # check api token exists in db
             register_user = users.find_one({"api_token": api_token})
@@ -438,8 +422,7 @@ class UpdateUser(Resource):
                             update_user['email'] = email
                         except EmailNotValidError as e:
                             # email is not valid, exception message is human-readable
-                            return make_response(jsonify({"success": "false", "status_code": 403, "payload": {},
-                                                          "error": {"message": str(e)}}), 403)
+                            return api_responses.error_response("MOOV_ERR_05", str(e))
 
                     if usertype:
                         update_user['user_type'] = usertype
@@ -466,20 +449,16 @@ class UpdateUser(Resource):
                     else:
                         update_user_payload = {}
 
-                    return make_response(
-                        jsonify({"success": "true", "status_code": 200, "payload": update_user_payload}), 200)
+                    return api_responses.success_response(update_user_payload)
 
                 else:
-                    return make_response(jsonify({"success": "false", "status_code": 403, "payload": {},
-                                                  "error": {"message": "Unauthorized"}}), 403)
+                    return api_responses.error_response("MOOV_ERR_04", api_responses.moovinto_error_codes["MOOV_ERR_04"])
 
             else:
-                return make_response(jsonify({"success": "false", "status_code": 403, "payload": {},
-                                              "error": {"message": "Unauthorized"}}), 403)
+                return api_responses.error_response("MOOV_ERR_11", "User not found")
 
         else:
-            return make_response(jsonify({"success": "false", "status_code": 403, "payload": {},
-                                          "error": {"message": "Unauthorized"}}), 403)
+            return api_responses.error_response("MOOV_ERR_01", api_responses.moovinto_error_codes["MOOV_ERR_01"])
 
 
 reset_pwd_model = api.model('Reset Password', {
@@ -498,8 +477,7 @@ class ResetPassword(Resource):
             email = data['email']
 
             if not email:
-                return make_response(jsonify({"success": "false", "status_code": 400, "payload": {},
-                        "error": {"message": "Field cannot be empty"}}), 400)
+                return api_responses.error_response("MOOV_ERR_08", api_responses.moovinto_error_codes["MOOV_ERR_08"])
 
             if email:
                 try:
@@ -507,8 +485,7 @@ class ResetPassword(Resource):
                     email = v["email"]  # replace with normalized form
                 except EmailNotValidError as e:
                     # email is not valid, exception message is human-readable
-                    return make_response(jsonify({"success": "false", "status_code": 403, "payload": {},
-                                                  "error": {"message": str(e)}}), 403)
+                    return api_responses.error_response("MOOV_ERR_05", str(e))
 
             registered_user = users.find_one({ "email" : email })
 
@@ -524,12 +501,11 @@ class ResetPassword(Resource):
                 link = request.url_root + "reset-password-verify/?resetkey=" + reset_key + "&email=" + email
                 msg.html = render_template('/mails/reset-password.html', link=link)
                 mail.send(msg)
-                return make_response(
-                    jsonify({"success": "true", "status_code": 200, "payload": {}}), 200)
+                mailsentpayload = {}
+                return api_responses.success_response(mailsentpayload)
 
             else:
-                return make_response(jsonify({"success": "false", "status_code": 403, "payload": {},
-                                          "error": {"message": "Unauthorized"}}), 403)
+                return api_responses.error_response("MOOV_ERR_11", "User not found")
 
 
 reset_password_verify_parser = api.parser()
@@ -545,8 +521,7 @@ class ResetPasswordVerify(Resource):
         resetkey = request.args.get("resetkey")
         email = request.args.get("email")
         if not resetkey:
-            return make_response(jsonify({"success": "false", "status_code": 403, "payload": {},
-                                          "error": {"message": "Unauthorized"}}), 403)
+            return api_responses.error_response("MOOV_ERR_08", api_responses.moovinto_error_codes["MOOV_ERR_08"])
 
         registered_user = users.find_one({"email": email})
 
@@ -567,17 +542,13 @@ class ResetPasswordVerify(Resource):
                               recipients=[email])
                 msg.html = render_template('/mails/random-password.html', pwd=password)
                 mail.send(msg)
-                return make_response(
-                    jsonify({"success": "true", "status_code": 200, "payload": {}}), 200)
+                mailsentpayload = {}
+                return api_responses.success_response(mailsentpayload)
 
             else:
-                return make_response(jsonify({"success": "false", "status_code": 403, "payload": {},
-                                              "error": {"message": "Unauthorized"}}), 403)
-
-
+                return api_responses.error_response("MOOV_ERR_10", api_responses.moovinto_error_codes["MOOV_ERR_10"])
         else:
-            return make_response(jsonify({"success": "false", "status_code": 403, "payload": {},
-                                          "error": {"message": "Unauthorized"}}), 403)
+            return api_responses.error_response("MOOV_ERR_11", "User not found")
 
 renters_resource = api.parser()
 renters_resource.add_argument('API-TOKEN', location='headers', required=True)
@@ -630,8 +601,7 @@ class UpdateRentersData(Resource):
             data = request.get_json()
 
             if not api_token:
-                return make_response(jsonify({"success": "false", "status_code": 403, "payload": {},
-                                              "error": {"message": "Unauthorized"}}), 403)
+                return api_responses.error_response("MOOV_ERR_03", api_responses.moovinto_error_codes["MOOV_ERR_03"])
 
             # check api token exists in db
             register_user = users.find_one({"api_token": api_token})
@@ -657,7 +627,7 @@ class UpdateRentersData(Resource):
                         "email": check_renter['email']
                     }
                     renters.find_one_and_update({"_id": mongo_id}, {"$set": update_renter})
-                    return make_response(jsonify({"success": "true", "status_code": 200, "payload": update_renter}), 200)
+                    return api_responses.success_response(update_renter)
                 else:
                     newrenter = {
                         "teamup": data['teamup'],
@@ -675,15 +645,13 @@ class UpdateRentersData(Resource):
                         "email": register_user['email']
                     }
                     database.renters.insert_one(newrenter)
-                    return make_response(jsonify({"success": "true", "status_code": 200, "payload": newrenter}), 200)
+                    return api_responses.success_response(newrenter)
 
             else:
-                return make_response(jsonify({"success": "false", "status_code": 403, "payload": {},
-                                              "error": {"message": "Unauthorized"}}), 403)
+                return api_responses.error_response("MOOV_ERR_10", api_responses.moovinto_error_codes["MOOV_ERR_10"])
 
         else:
-            return make_response(jsonify({"success": "false", "status_code": 403, "payload": {},
-                                      "error": {"message": "Unauthorized"}}), 403)
+            return api_responses.error_response("MOOV_ERR_01", api_responses.moovinto_error_codes["MOOV_ERR_01"])
 
 """
 renter_preferences_model = api.model('Renters Preferences', {
@@ -817,14 +785,13 @@ class UpdateRentersData(Resource):
                 }
                 database.properties.insert_one(newproperty)
                 # print(dumps(newproperty))
-                return make_response(jsonify({"success": "true", "status_code": 200, "payload": json.loads(json_util.dumps(newproperty))}), 200)
+                return api_responses.success_response(newproperty)
+                # return make_response(jsonify({"success": "true", "status_code": 200, "payload": json.loads(json_util.dumps(newproperty))}), 200)
             else:
-                return make_response(jsonify({"success": "false", "status_code": 403, "payload": {},
-                                              "error": {"message": "Unauthorized"}}), 403)
+                return api_responses.error_response("MOOV_ERR_10", api_responses.moovinto_error_codes["MOOV_ERR_10"])
 
         else:
-            return make_response(jsonify({"success": "false", "status_code": 403, "payload": {},
-                                      "error": {"message": "Unauthorized"}}), 403)
+            return api_responses.error_response("MOOV_ERR_01", api_responses.moovinto_error_codes["MOOV_ERR_01"])
 
 
 get_property_parser = api.parser()
@@ -846,8 +813,7 @@ class PropertyLocation(Resource):
         state_county_code = request.args.get("state_county_code")
         zip_code = request.args.get("zip_code")
         if not api_token:
-            return make_response(jsonify({"success": "false", "status_code": 403, "payload": {},
-                                          "error": {"message": "Unauthorized"}}), 403)
+            return api_responses.error_response("MOOV_ERR_03", api_responses.moovinto_error_codes["MOOV_ERR_03"])
 
         # check api token exists in db
         register_user = users.find_one({"api_token": api_token})
@@ -873,12 +839,10 @@ class PropertyLocation(Resource):
                     {"success": "true", "status_code": 200, "payload": json.loads(json_util.dumps(location_data))}), 200)
 
             else:
-                return make_response(jsonify({"success": "false", "status_code": 404, "payload": {},
-                                              "error": {"message": "Not found"}}), 404)
+                return api_responses.error_response("MOOV_ERR_10", api_responses.moovinto_error_codes["MOOV_ERR_10"])
 
         else:
-            return make_response(jsonify({"success": "false", "status_code": 403, "payload": {},
-                                      "error": {"message": "Unauthorized"}}), 403)
+            return api_responses.error_response("MOOV_ERR_11", api_responses.moovinto_error_codes["MOOV_ERR_11"])
 
 
 search_api = Namespace('find', description='Search operations')
